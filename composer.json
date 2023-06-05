@@ -1,0 +1,64 @@
+{
+  "name": "wwwision/dcb-example",
+  "description": "Simple example for the Dynamic Consistency Boundary pattern described by Sara Pellegrini",
+  "type": "project",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Bastian Waidelich",
+      "email": "b.waidelich@wwwision.de"
+    }
+  ],
+  "funding": [
+    {
+      "type": "github",
+      "url": "https://github.com/sponsors/bwaidelich"
+    },
+    {
+      "type": "paypal",
+      "url": "https://www.paypal.me/bwaidelich"
+    }
+  ],
+  "config": {
+    "platform": {
+      "php": "8.2"
+    }
+  },
+  "require": {
+    "php": "8.2",
+    "ramsey/uuid": "^4.7",
+    "webmozart/assert": "^1.11",
+    "wwwision/dcb-eventstore": "^1.0",
+    "wwwision/dcb-eventstore-doctrine": "^1.0"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "phpstan/phpstan": "^1.10",
+    "squizlabs/php_codesniffer": "^4.0.x-dev",
+    "phpunit/phpunit": "^10.1",
+    "behat/behat": "^3.13"
+  },
+  "autoload": {
+    "psr-4": {
+      "Wwwision\\DCBExample\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Wwwision\\DCBExample\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test-phpstan": "phpstan",
+    "test-cs": "phpcs --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
+    "test-cs:fix": "phpcbf --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
+    "test-unit": "phpunit tests",
+    "test-behat": "behat",
+    "test": [
+      "@test-phpstan",
+      "@test-cs",
+      "@test-unit",
+      "@test-behat"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+default:
+  autoload:
+    '': '%paths.base%/tests/Behat'
+  suites:
+    default:
+      paths: ['%paths.base%/tests/Behat']
+      contexts: [Wwwision\DCBExample\Tests\Behat\Bootstrap\FeatureContext]
+  formatters:
+    pretty: false
+    progress: true
