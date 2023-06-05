@@ -70,6 +70,6 @@ final class StudentSubscriptionsAggregate implements Aggregate
 
     public function eventTypes(): EventTypes
     {
-        return EventTypes::fromStrings('StudentRegistered');
+        return EventTypes::fromStrings('StudentSubscribedToCourse', 'StudentUnsubscribedFromCourse');
     }
 }
