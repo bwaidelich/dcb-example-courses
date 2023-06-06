@@ -48,10 +48,6 @@ Install via [composer](https://getcomposer.org):
 composer create-project wwwision/dcb-example
 ```
 
-> **Note**
-> The example requires [PHP 8.2+](https://www.php.net/) to be installed.
-> If composer complaints even though the right version is installed, try using the `--ignore-platform-reqs` flag
-
 Now you should be able to run the [example script](index.php) via
 
 ```shell
