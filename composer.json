@@ -25,7 +25,7 @@
     }
   },
   "require": {
-    "php": "8.2",
+    "php": ">=8.2",
     "ramsey/uuid": "^4.7",
     "webmozart/assert": "^1.11",
     "wwwision/dcb-eventstore": "^1.0",
