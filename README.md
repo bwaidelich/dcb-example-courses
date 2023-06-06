@@ -96,4 +96,4 @@ Feel free to start/join a [discussion](https://github.com/bwaidelich/dcb-example
 ¹ The purpose of the [AggregateLoader](https://github.com/bwaidelich/dcb-eventstore/blob/main/src/Aggregate/AggregateLoader.php)
 is to allow interaction with multiple Aggregates without having to fetch multiple Event Streams.
 It is currently one of the weakest links in this implementation because it adds some hidden complexity – I hope, that I
-can rework this at some point
+can rework this at some point 
