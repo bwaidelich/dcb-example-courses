@@ -8,6 +8,7 @@ use Behat\Gherkin\Node\PyStringNode;
 use Wwwision\DCBEventStore\Exception\ConstraintException;
 use Wwwision\DCBEventStore\Model\DomainEvent;
 use Wwwision\DCBEventStore\Model\Events;
+use Wwwision\DCBEventStore\Model\StreamQuery;
 use Wwwision\DCBExample\Command\Command;
 use Wwwision\DCBExample\Command\CreateCourse;
 use Wwwision\DCBExample\Command\RegisterStudent;
@@ -231,7 +232,7 @@ final class FeatureContext implements Context
     private function appendEvents(DomainEvent ...$domainEvents): void
     {
         $convertedEvents = Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), $domainEvents));
-        $this->eventStore->append($convertedEvents);
+        $this->eventStore->append($convertedEvents, StreamQuery::matchingNone(), null);
     }
 
 
