@@ -20,8 +20,8 @@ This package models the example of this presentation (with a few deviations) usi
 * [Commands](src/Command) are just a concept of this example package. They implement the [Command Marker Interface](src/Command/Command.php)
 * The [CommandHandler](src/CommandHandler.php) is the central authority, handling and verifying incoming Commands
 * ...it uses the [AggregateLoader](https://github.com/bwaidelich/dcb-eventstore/blob/main/src/Aggregate/AggregateLoader.php) to interact with all involved Aggregates¹
-* The [Aggregates](src/Model/Aggregate) are surprisingly small because they focus on a single responsibility (e.g. instead of a "CourseAggregate" there are three aggregates [CourseExistenceAggregate.php](src/Model/Aggregate/CourseExistenceAggregate.php), [CourseTitleAggregate.php](src/Model/Aggregate/CourseTitleAggregate.php) and [CourseCapacityAggregate.php](src/Model/Aggregate/CourseCapacityAggregate.php))
-* ...Aggregates record [Events](src/Event) that are serialized with the [EventNormalizer.php](src/Event/Normalizer/EventNormalizer.php)
+* The [Aggregates](src/Model/Aggregate) are surprisingly small because they focus on a single responsibility (e.g. instead of a "CourseAggregate" there are three aggregates [CourseExistenceAggregate](src/Model/Aggregate/CourseExistenceAggregate.php), [CourseTitleAggregate](src/Model/Aggregate/CourseTitleAggregate.php) and [CourseCapacityAggregate](src/Model/Aggregate/CourseCapacityAggregate))
+* ...Aggregates record [Events](src/Event) that are serialized with the [EventNormalizer](src/Event/Normalizer/EventNormalizer.php)
 * This package contains no Read Model (e.g. projections) yet
 
 ### Considerations / Findings
