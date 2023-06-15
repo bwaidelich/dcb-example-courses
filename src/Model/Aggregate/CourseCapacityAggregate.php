@@ -48,6 +48,9 @@ final class CourseCapacityAggregate implements Aggregate
 
     public function changeCourseCapacity(CourseCapacity $newCapacity): void
     {
+        if ($newCapacity->equals($this->state->courseCapacity)) {
+            throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because that is already the courses capacity', $this->courseId->value, $newCapacity->value), 1686819073);
+        }
         if ($this->state->numberOfSubscriptions > $newCapacity->value) {
             throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because it already has %d active subscriptions', $this->courseId->value, $newCapacity->value, $this->state->numberOfSubscriptions), 1684604361);
         }

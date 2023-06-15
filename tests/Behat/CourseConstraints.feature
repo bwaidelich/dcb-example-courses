@@ -23,6 +23,14 @@ Feature:
       """
 
   Scenario:
+    Given course "c1" exists with a capacity of 3
+    When course "c1" capacity is changed to 3
+    Then the command should be rejected with the following message:
+      """
+      Failed to change capacity of course with id "c1" to 3 because that is already the courses capacity
+      """
+
+  Scenario:
     Given course "c1" exists with the title "Some Course Title"
     When course "c1" is renamed to "Some Course Title"
     Then the command should be rejected with the following message:
