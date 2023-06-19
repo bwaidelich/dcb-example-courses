@@ -13,7 +13,7 @@ This facilitates focussing on the _behavior_ of the Domain Model rather than on 
 performance improvements as multiple aggregates can act on the same events without requiring synchronization.
 
 Read all about this interesting approach in the blog post mentioned above or watch Saras talk on [YouTube](https://www.youtube.com/watch?v=DhhxKoOpJe0&t=150s) (Italian with English subtitles).
-This package models the example of this presentation (with a few deviations) using the [wwwision/dcb-eventstore](https://github.com/bwaidelich/dcb-eventstore) package and the [wwwision/dcb-eventstore-doctrine](https://raw.githubusercontent.com/bwaidelich/dcb-eventst) database adapter.
+This package models the example of this presentation (with a few deviations) using the [wwwision/dcb-eventstore](https://github.com/bwaidelich/dcb-eventstore) package and the [wwwision/dcb-eventstore-doctrine](https://github.com/bwaidelich/dcb-eventstore-doctrine) database adapter.
 
 ### Important Classes / Concepts
 
