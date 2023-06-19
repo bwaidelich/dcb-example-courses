@@ -15,7 +15,7 @@
         </testsuite>
     </testsuites>
 
-    <coverage includeUncoveredFiles="false"></coverage>
+    <coverage includeUncoveredFiles="false" />
 
     <source restrictDeprecations="true" restrictNotices="true" restrictWarnings="true">
         <include>

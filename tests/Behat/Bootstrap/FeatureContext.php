@@ -5,9 +5,16 @@ namespace Wwwision\DCBExample\Tests\Behat\Bootstrap;
 
 use Behat\Behat\Context\Context;
 use Behat\Gherkin\Node\PyStringNode;
-use Wwwision\DCBEventStore\Exception\ConstraintException;
+use Behat\Gherkin\Node\TableNode;
+use InvalidArgumentException;
+use Wwwision\DCBEventStore\EventStream;
+use Wwwision\DCBExample\Exception\ConstraintException;
 use Wwwision\DCBEventStore\Model\DomainEvent;
+use Wwwision\DCBEventStore\Model\Event;
+use Wwwision\DCBEventStore\Model\EventEnvelope;
+use Wwwision\DCBEventStore\Model\EventId;
 use Wwwision\DCBEventStore\Model\Events;
+use Wwwision\DCBEventStore\Model\ExpectedLastEventId;
 use Wwwision\DCBEventStore\Model\StreamQuery;
 use Wwwision\DCBExample\Command\Command;
 use Wwwision\DCBExample\Command\CreateCourse;
@@ -29,9 +36,15 @@ use Wwwision\DCBExample\Model\StudentId;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStore\Helper\InMemoryEventStore;
 use PHPUnit\Framework\Assert;
+use function array_diff;
+use function array_keys;
 use function array_map;
 use function explode;
+use function implode;
+use function json_decode;
+use function sprintf;
 use function var_dump;
+use const JSON_THROW_ON_ERROR;
 
 final class FeatureContext implements Context
 {
@@ -44,7 +57,54 @@ final class FeatureContext implements Context
 
     public function __construct()
     {
-        $this->eventStore = InMemoryEventStore::create();
+        $innerEventStore = InMemoryEventStore::create();
+
+        $this->eventStore = new class ($innerEventStore) implements EventStore {
+
+            public Events $appendedEvents;
+            public Events $readEvents;
+
+            public function __construct(private EventStore $inner) {
+                $this->appendedEvents = Events::none();
+                $this->readEvents = Events::none();
+            }
+
+            public function setup(): void
+            {
+                $this->inner->setup();
+            }
+
+            public function streamAll(): EventStream
+            {
+                $innerStream = $this->inner->streamAll();
+                foreach ($innerStream as $eventEnvelope) {
+                    $this->readEvents = $this->readEvents->append($eventEnvelope->event);
+                }
+                return $innerStream;
+            }
+
+            public function stream(StreamQuery $query): EventStream
+            {
+                $innerStream = $this->inner->stream($query);
+                foreach ($innerStream as $eventEnvelope) {
+                    $this->readEvents = $this->readEvents->append($eventEnvelope->event);
+                }
+                return $innerStream;
+            }
+
+            public function append(Events $events): void
+            {
+                $this->appendedEvents = $events;
+                $this->inner->append($events);
+            }
+
+
+            public function conditionalAppend(Events $events, StreamQuery $query, ExpectedLastEventId $expectedLastEventId): void
+            {
+                $this->inner->conditionalAppend($events, $query, $expectedLastEventId);
+                $this->appendedEvents = $events;
+            }
+        };
         $this->commandHandler = new CommandHandler($this->eventStore);
         $this->eventNormalizer = new EventNormalizer();
     }
@@ -74,7 +134,7 @@ final class FeatureContext implements Context
             $domainEvents[] = new CourseCreated(
                 CourseId::fromString($courseId),
                 CourseCapacity::fromInteger($initialCapacity ?? 10),
-                CourseTitle::fromString($courseTitle ?? 'Course ' . $courseId),
+                courseTitle::fromString($courseTitle ?? 'course ' . $courseId),
             );
         }
         $this->appendEvents(...$domainEvents);
@@ -136,7 +196,7 @@ final class FeatureContext implements Context
         $command = new CreateCourse(
             CourseId::fromString($courseId),
             CourseCapacity::fromInteger($initialCapacity ?? 10),
-            CourseTitle::fromString($courseTitle ?? 'Course ' . $courseId),
+            courseTitle::fromString($courseTitle ?? 'course ' . $courseId),
         );
         $this->handleCommandAndCatchException($command);
     }
@@ -218,10 +278,76 @@ final class FeatureContext implements Context
         Assert::assertNull($this->lastConstraintException, 'Expected no error, but one was thrown');
     }
 
+    /**
+     * @Then no events should be read
+     */
+    public function noEventsShouldBeRead(): void
+    {
+        Assert::assertCount(0, $this->eventStore->readEvents);
+    }
+
+    /**
+     * @Then the following event(s) should be read:
+     */
+    public function theFollowingEventsShouldBeRead(TableNode $expectedEventsTable): void
+    {
+        self::asserEvents($expectedEventsTable, $this->eventStore->readEvents);
+    }
+
+
+    /**
+     * @Then no events should be appended
+     */
+    public function noEventsShouldBeAppended(): void
+    {
+        Assert::assertSame(0, $this->eventStore->appendedEvents->count(), 'Expected no events to be appended');
+    }
+
+    /**
+     * @Then the following event(s) should be appended:
+     */
+    public function theFollowingEventsShouldBeAppended(TableNode $expectedEventsTable): void
+    {
+        self::asserEvents($expectedEventsTable, $this->eventStore->appendedEvents);
+    }
+
+    private static function asserEvents(TableNode $expectedEventsTable, Events $events): void
+    {
+        $expectedEvents = array_map(static fn (array $col) => array_map(static fn(string $val) => json_decode($val, true, 512, JSON_THROW_ON_ERROR), $col), $expectedEventsTable->getColumnsHash());
+        $actualEvents = [];
+        $index = 0;
+        foreach ($events as $event) {
+            $actualEvents[] = self::eventToArray(isset($expectedEvents[$index]) ? array_keys($expectedEvents[$index]) : ['Id', 'Type', 'Data', 'Domain Ids'], $event);
+            $index ++;
+        }
+        Assert::assertEquals($expectedEvents, $actualEvents);
+    }
+
+    private static function eventToArray(array $keys, Event $event): array
+    {
+        $supportedKeys = ['Id', 'Type', 'Data', 'Domain Ids'];
+        $unsupportedKeys = array_diff($keys, $supportedKeys);
+        if ($unsupportedKeys !== []) {
+            throw new InvalidArgumentException(sprintf('Invalid key(s) "%s" for expected event. Allowed keys are: "%s"', implode('", "', $unsupportedKeys), implode('", "', $supportedKeys)), 1686128517);
+        }
+        $actualAsArray = [
+            'Id' => $event->id->value,
+            'Type' => $event->type->value,
+            'Data' => json_decode($event->data->value, true, 512, JSON_THROW_ON_ERROR),
+            'Domain Ids' => $event->domainIds->toArray(),
+        ];
+        foreach (array_diff($supportedKeys, $keys) as $unusedKey) {
+            unset($actualAsArray[$unusedKey]);
+        }
+        return $actualAsArray;
+    }
+
     // ----------------------------
 
     private function handleCommandAndCatchException(Command $command): void
     {
+        $this->eventStore->appendedEvents = Events::none();
+        $this->eventStore->readEvents = Events::none();
         try {
             $this->commandHandler->handle($command);
         } catch (ConstraintException $exception) {
@@ -231,8 +357,7 @@ final class FeatureContext implements Context
 
     private function appendEvents(DomainEvent ...$domainEvents): void
     {
-        $convertedEvents = Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), $domainEvents));
-        $this->eventStore->append($convertedEvents, StreamQuery::matchingNone(), null);
+        $this->eventStore->append(Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), $domainEvents)));
     }
 
 
