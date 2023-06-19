@@ -7,7 +7,6 @@ namespace Wwwision\DCBExample\Event\Normalizer;
 use JsonException;
 use RuntimeException;
 use Webmozart\Assert\Assert;
-use Wwwision\DCBEventStore\EventNormalizer as EventNormalizerInterface;
 use Wwwision\DCBEventStore\Model\DomainEvent;
 use Wwwision\DCBEventStore\Model\Event;
 use Wwwision\DCBEventStore\Model\EventData;
@@ -25,9 +24,9 @@ use function substr;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * Simple implementation of the {@see EventNormalizerInterface} that expects Domain Events to implement the {@see FromArraySupport} interface
+ * Simple converter that expects Domain Events to implement the {@see FromArraySupport} interface
  */
-final readonly class EventNormalizer implements EventNormalizerInterface
+final readonly class EventNormalizer
 {
     public function convertEvent(Event|EventEnvelope $event): DomainEvent
     {

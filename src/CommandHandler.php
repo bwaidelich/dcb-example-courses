@@ -5,14 +5,9 @@ declare(strict_types=1);
 namespace Wwwision\DCBExample;
 
 use RuntimeException;
-use Wwwision\DCBExample\Model\Aggregate\Aggregate;
 use Wwwision\DCBEventStore\EventStore;
-use Wwwision\DCBExample\Exception\ConstraintException;
-use Wwwision\DCBEventStore\Model\DomainEvent;
-use Wwwision\DCBEventStore\Model\DomainEvents;
 use Wwwision\DCBEventStore\Model\DomainId;
 use Wwwision\DCBEventStore\Model\DomainIds;
-use Wwwision\DCBEventStore\Model\Events;
 use Wwwision\DCBEventStore\Model\EventTypes;
 use Wwwision\DCBEventStore\Model\ExpectedLastEventId;
 use Wwwision\DCBEventStore\Model\StreamQuery;
@@ -23,6 +18,7 @@ use Wwwision\DCBExample\Command\RenameCourse;
 use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
 use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
 use Wwwision\DCBExample\Command\UpdateCourseCapacity;
+use Wwwision\DCBExample\Event\Appender\EventAppender;
 use Wwwision\DCBExample\Event\CourseCapacityChanged;
 use Wwwision\DCBExample\Event\CourseCreated;
 use Wwwision\DCBExample\Event\CourseRenamed;
@@ -30,15 +26,15 @@ use Wwwision\DCBExample\Event\Normalizer\EventNormalizer;
 use Wwwision\DCBExample\Event\StudentRegistered;
 use Wwwision\DCBExample\Event\StudentSubscribedToCourse;
 use Wwwision\DCBExample\Event\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\Exception\ConstraintException;
+use Wwwision\DCBExample\Model\Aggregate\Aggregate;
 use Wwwision\DCBExample\Model\Aggregate\CourseCapacityAggregate;
 use Wwwision\DCBExample\Model\Aggregate\CourseExistenceAggregate;
 use Wwwision\DCBExample\Model\Aggregate\CourseTitleAggregate;
 use Wwwision\DCBExample\Model\Aggregate\StudentExistenceAggregate;
 use Wwwision\DCBExample\Model\Aggregate\StudentSubscriptionsAggregate;
 
-use function array_map;
 use function array_unique;
-use function iterator_to_array;
 use function sprintf;
 
 /**
@@ -70,20 +66,19 @@ final readonly class CommandHandler
     private function handleCreateCourse(CreateCourse $command): void
     {
         $courseExistenceAggregate = new CourseExistenceAggregate($command->courseId);
-        [$query, $expectedLastEventId] = $this->reconstituteAggregateStates($courseExistenceAggregate);
+        $appender = $this->reconstituteAggregateStates($courseExistenceAggregate);
 
         if ($courseExistenceAggregate->courseExists()) {
             throw new ConstraintException(sprintf('Failed to create course with id "%s" because a course with that id already exists', $command->courseId->value), 1684593925);
         }
-        $domainEvent = new CourseCreated($command->courseId, $command->initialCapacity, $command->courseTitle);
-        $this->appendEvents($domainEvent, $query, $expectedLastEventId);
+        $appender->append(new CourseCreated($command->courseId, $command->initialCapacity, $command->courseTitle));
     }
 
     private function handleRenameCourse(RenameCourse $command): void
     {
         $courseExistenceAggregate = new CourseExistenceAggregate($command->courseId);
         $courseTitleAggregate = new CourseTitleAggregate($command->courseId);
-        [$query, $expectedLastEventId] = $this->reconstituteAggregateStates($courseExistenceAggregate, $courseTitleAggregate);
+        $appender = $this->reconstituteAggregateStates($courseExistenceAggregate, $courseTitleAggregate);
 
         if (!$courseExistenceAggregate->courseExists()) {
             throw new ConstraintException(sprintf('Failed to rename course with id "%s" because a course with that id does not exist', $command->courseId->value), 1684509782);
@@ -91,19 +86,17 @@ final readonly class CommandHandler
         if ($courseTitleAggregate->courseTitle !== null && $courseTitleAggregate->courseTitle->equals($command->newCourseTitle)) {
             throw new ConstraintException(sprintf('Failed to rename course with id "%s" to "%s" because this is already the title of this course', $command->courseId->value, $command->newCourseTitle->value), 1684509837);
         }
-        $domainEvent = new CourseRenamed($command->courseId, $command->newCourseTitle);
-        $this->appendEvents($domainEvent, $query, $expectedLastEventId);
+        $appender->append(new CourseRenamed($command->courseId, $command->newCourseTitle));
     }
 
     private function handleRegisterStudent(RegisterStudent $command): void
     {
         $studentExistenceAggregate = new StudentExistenceAggregate($command->studentId);
-        [$query, $expectedLastEventId] = $this->reconstituteAggregateStates($studentExistenceAggregate);
+        $appender = $this->reconstituteAggregateStates($studentExistenceAggregate);
         if ($studentExistenceAggregate->studentExists()) {
             throw new ConstraintException(sprintf('Failed to register student with id "%s" because a student with that id already exists', $command->studentId->value), 1684579300);
         }
-        $domainEvent = new StudentRegistered($command->studentId);
-        $this->appendEvents($domainEvent, $query, $expectedLastEventId);
+        $appender->append(new StudentRegistered($command->studentId));
     }
 
     private function handleSubscribeStudentToCourse(SubscribeStudentToCourse $command): void
@@ -112,7 +105,7 @@ final readonly class CommandHandler
         $courseCapacityAggregate = new CourseCapacityAggregate($command->courseId);
         $studentExistenceAggregate = new StudentExistenceAggregate($command->studentId);
         $studentSubscriptionsAggregate = new StudentSubscriptionsAggregate($command->studentId);
-        [$query, $expectedLastEventId] = $this->reconstituteAggregateStates($courseExistenceAggregate, $courseCapacityAggregate, $studentExistenceAggregate, $studentSubscriptionsAggregate);
+        $appender = $this->reconstituteAggregateStates($courseExistenceAggregate, $courseCapacityAggregate, $studentExistenceAggregate, $studentSubscriptionsAggregate);
 
         if (!$studentExistenceAggregate->studentExists()) {
             throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a student with that id does not exist', $command->studentId->value, $command->courseId->value), 1686914105);
@@ -130,8 +123,7 @@ final readonly class CommandHandler
         if ($studentSubscriptionsAggregate->numberOfSubscriptions() === $maximumSubscriptionsPerStudent) {
             throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because that student is already subscribed the maximum of %d courses', $command->studentId->value, $command->courseId->value, $maximumSubscriptionsPerStudent), 1684605232);
         }
-        $domainEvent = new StudentSubscribedToCourse($command->courseId, $command->studentId);
-        $this->appendEvents($domainEvent, $query, $expectedLastEventId);
+        $appender->append(new StudentSubscribedToCourse($command->courseId, $command->studentId));
     }
 
     private function handleUnsubscribeStudentFromCourse(UnsubscribeStudentFromCourse $command): void
@@ -139,7 +131,7 @@ final readonly class CommandHandler
         $courseExistenceAggregate = new CourseExistenceAggregate($command->courseId);
         $studentExistenceAggregate = new StudentExistenceAggregate($command->studentId);
         $studentSubscriptionsAggregate = new StudentSubscriptionsAggregate($command->studentId);
-        [$query, $expectedLastEventId] = $this->reconstituteAggregateStates($courseExistenceAggregate, $studentExistenceAggregate, $studentSubscriptionsAggregate);
+        $appender = $this->reconstituteAggregateStates($courseExistenceAggregate, $studentExistenceAggregate, $studentSubscriptionsAggregate);
 
         if (!$courseExistenceAggregate->courseExists()) {
             throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1684579448);
@@ -150,15 +142,14 @@ final readonly class CommandHandler
         if (!$studentSubscriptionsAggregate->subscribedToCourse($command->courseId)) {
             throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because that student is not subscribed to this course', $command->studentId->value, $command->courseId->value), 1684579464);
         }
-        $domainEvent = new StudentUnsubscribedFromCourse($command->studentId, $command->courseId);
-        $this->appendEvents($domainEvent, $query, $expectedLastEventId);
+        $appender->append(new StudentUnsubscribedFromCourse($command->studentId, $command->courseId));
     }
 
     private function handleUpdateCourseCapacity(UpdateCourseCapacity $command): void
     {
         $courseExistenceAggregate = new CourseExistenceAggregate($command->courseId);
         $courseCapacityAggregate = new CourseCapacityAggregate($command->courseId);
-        [$query, $expectedLastEventId] = $this->reconstituteAggregateStates($courseExistenceAggregate, $courseCapacityAggregate);
+        $appender = $this->reconstituteAggregateStates($courseExistenceAggregate, $courseCapacityAggregate);
 
         if (!$courseExistenceAggregate->courseExists()) {
             throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because a course with that id does not exist', $command->courseId->value, $command->newCapacity->value), 1684604283);
@@ -169,17 +160,12 @@ final readonly class CommandHandler
         if ($courseCapacityAggregate->numberOfSubscriptions() > $command->newCapacity->value) {
             throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because it already has %d active subscriptions', $command->courseId->value, $command->newCapacity->value, $courseCapacityAggregate->numberOfSubscriptions()), 1684604361);
         }
-        $domainEvent = new CourseCapacityChanged($command->courseId, $command->newCapacity);
-        $this->appendEvents($domainEvent, $query, $expectedLastEventId);
+        $appender->append(new CourseCapacityChanged($command->courseId, $command->newCapacity));
     }
 
     // -----------------------------
 
-    /**
-     * @param Aggregate ...$aggregates
-     * @return array{0: StreamQuery, 1: ExpectedLastEventId}
-     */
-    private function reconstituteAggregateStates(Aggregate ...$aggregates): array
+    private function reconstituteAggregateStates(Aggregate ...$aggregates): EventAppender
     {
         $domainIds = [];
         $eventTypes = [];
@@ -205,15 +191,6 @@ final readonly class CommandHandler
             }
             $expectedLastEventId = ExpectedLastEventId::fromEventId($eventEnvelope->event->id);
         }
-        return [
-            0 => $query,
-            1 => $expectedLastEventId
-        ];
-    }
-
-    private function appendEvents(DomainEvents|DomainEvent $domainEvents, StreamQuery $query, ExpectedLastEventId $expectedLastEventId): void
-    {
-        $convertedEvents = Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), $domainEvents instanceof DomainEvents ? iterator_to_array($domainEvents) : [$domainEvents]));
-        $this->eventStore->conditionalAppend($convertedEvents, $query, $expectedLastEventId);
+        return new EventAppender($this->eventStore, $query, $expectedLastEventId);
     }
 }
