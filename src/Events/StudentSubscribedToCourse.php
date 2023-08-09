@@ -2,21 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Event;
+namespace Wwwision\DCBExample\Events;
 
-use Wwwision\DCBExample\Event\Normalizer\FromArraySupport;
-use Wwwision\DCBExample\Model\CourseId;
-use Wwwision\DCBExample\Model\StudentId;
-use Wwwision\DCBEventStore\Model\DomainEvent;
-use Wwwision\DCBEventStore\Model\DomainIds;
 use Webmozart\Assert\Assert;
+use Wwwision\DCBEventStore\Types\Tags;
+use Wwwision\DCBExample\Types\CourseId;
+use Wwwision\DCBExample\Types\StudentId;
 
 /**
- * Domain Event that occurs when a student was subscribed to a course
+ * Domain Events that occurs when a student was subscribed to a course
  *
  * Note: This event affects two entities (course and student)!
  */
-final readonly class StudentSubscribedToCourse implements DomainEvent, FromArraySupport
+final readonly class StudentSubscribedToCourse implements DomainEvent
 {
     public function __construct(
         public CourseId $courseId,
@@ -39,8 +37,8 @@ final readonly class StudentSubscribedToCourse implements DomainEvent, FromArray
         );
     }
 
-    public function domainIds(): DomainIds
+    public function tags(): Tags
     {
-        return DomainIds::create($this->courseId, $this->studentId);
+        return Tags::create($this->courseId->toTag(), $this->studentId->toTag());
     }
 }

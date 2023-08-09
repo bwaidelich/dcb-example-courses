@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Command;
+namespace Wwwision\DCBExample\Commands;
 
-use Wwwision\DCBExample\Model\CourseId;
-use Wwwision\DCBExample\Model\StudentId;
+use Wwwision\DCBExample\Types\CourseId;
+use Wwwision\DCBExample\Types\StudentId;
 
 /**
- * Command to subscribe a student to a course
+ * Commands to subscribe a student to a course
  */
 final readonly class SubscribeStudentToCourse implements Command
 {

@@ -14,5 +14,5 @@ Feature: Registering students
     Then no events should be read
     And the command should pass without errors
     And the following event should be appended:
-      | Type                | Data                | Domain Ids          |
-      | "StudentRegistered" | {"studentId": "s2"} | [{"student": "s2"}] |
+      | Type                | Data                | Tags           |
+      | "StudentRegistered" | {"studentId": "s2"} | ["student:s2"] |

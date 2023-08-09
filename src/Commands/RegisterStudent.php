@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Command;
+namespace Wwwision\DCBExample\Commands;
 
-use Wwwision\DCBExample\Model\StudentId;
+use Wwwision\DCBExample\Types\StudentId;
 
 /**
- * Command to register a new student in the system
+ * Commands to register a new student in the system
  */
 final readonly class RegisterStudent implements Command
 {

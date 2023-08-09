@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Command;
+namespace Wwwision\DCBExample\Commands;
 
 /**
  * Marker interface for all commands

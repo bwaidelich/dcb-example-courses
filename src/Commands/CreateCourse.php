@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Command;
+namespace Wwwision\DCBExample\Commands;
 
-use Wwwision\DCBExample\Model\CourseCapacity;
-use Wwwision\DCBExample\Model\CourseId;
-use Wwwision\DCBExample\Model\CourseTitle;
+use Wwwision\DCBExample\Types\CourseCapacity;
+use Wwwision\DCBExample\Types\CourseId;
+use Wwwision\DCBExample\Types\CourseTitle;
 
 /**
- * Command to create a new course
+ * Commands to create a new course
  */
 final readonly class CreateCourse implements Command
 {

@@ -22,9 +22,9 @@ Feature: Renaming courses
     Given course "c1" exists with the title "course 01"
     When course "c1" is renamed to "course 01 renamed"
     Then the following events should be read:
-      | Type            | Domain Ids         |
-      | "CourseCreated" | [{"course": "c1"}] |
+      | Type            | Tags          |
+      | "CourseCreated" | ["course:c1"] |
     And the command should pass without errors
     And the following event should be appended:
-      | Type            | Data                                                      | Domain Ids         |
-      | "CourseRenamed" | {"courseId": "c1", "newCourseTitle": "course 01 renamed"} | [{"course": "c1"}] |
+      | Type            | Data                                                      | Tags          |
+      | "CourseRenamed" | {"courseId": "c1", "newCourseTitle": "course 01 renamed"} | ["course:c1"] |

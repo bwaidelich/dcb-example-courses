@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Model;
+namespace Wwwision\DCBExample\Types;
 
 use JsonSerializable;
 use Webmozart\Assert\Assert;

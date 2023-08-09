@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Model;
+namespace Wwwision\DCBExample\Types;
 
 use JsonSerializable;
+use Wwwision\DCBEventStore\Types\Tag;
 
 /**
- * The title of a course
+ * Globally unique identifier of a course (usually represented as a UUID v4)
  */
-final readonly class CourseTitle implements JsonSerializable
+final readonly class CourseId implements JsonSerializable
 {
     private function __construct(public string $value)
     {
@@ -28,5 +29,10 @@ final readonly class CourseTitle implements JsonSerializable
     public function equals(self $other): bool
     {
         return $other->value === $this->value;
+    }
+
+    public function toTag(): Tag
+    {
+        return Tag::create('course', $this->value);
     }
 }

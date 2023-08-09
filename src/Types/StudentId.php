@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Model;
+namespace Wwwision\DCBExample\Types;
 
 use JsonSerializable;
-use Wwwision\DCBEventStore\Model\DomainId;
+use Wwwision\DCBEventStore\Types\Tag;
 
 /**
  * Globally unique identifier of a student (usually represented as a UUID v4)
  */
-final readonly class StudentId implements DomainId, JsonSerializable
+final readonly class StudentId implements JsonSerializable
 {
     private function __construct(public string $value)
     {
@@ -26,14 +26,8 @@ final readonly class StudentId implements DomainId, JsonSerializable
         return $this->value;
     }
 
-
-    public function key(): string
+    public function toTag(): Tag
     {
-        return 'student';
-    }
-
-    public function value(): string
-    {
-        return $this->value;
+        return Tag::create('student', $this->value);
     }
 }

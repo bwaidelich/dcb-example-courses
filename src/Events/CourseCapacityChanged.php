@@ -2,19 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Event;
+namespace Wwwision\DCBExample\Events;
 
-use Wwwision\DCBEventStore\Model\DomainEvent;
-use Wwwision\DCBExample\Event\Normalizer\FromArraySupport;
-use Wwwision\DCBExample\Model\CourseCapacity;
-use Wwwision\DCBExample\Model\CourseId;
-use Wwwision\DCBEventStore\Model\DomainIds;
 use Webmozart\Assert\Assert;
+use Wwwision\DCBEventStore\Types\Tags;
+use Wwwision\DCBExample\Types\CourseCapacity;
+use Wwwision\DCBExample\Types\CourseId;
 
 /**
- * Domain Event that occurs when the total capacity of a course has changed
+ * Domain Events that occurs when the total capacity of a course has changed
  */
-final readonly class CourseCapacityChanged implements DomainEvent, FromArraySupport
+final readonly class CourseCapacityChanged implements DomainEvent
 {
     public function __construct(
         public CourseId $courseId,
@@ -37,8 +35,8 @@ final readonly class CourseCapacityChanged implements DomainEvent, FromArraySupp
         );
     }
 
-    public function domainIds(): DomainIds
+    public function tags(): Tags
     {
-        return DomainIds::create($this->courseId);
+        return Tags::create($this->courseId->toTag());
     }
 }

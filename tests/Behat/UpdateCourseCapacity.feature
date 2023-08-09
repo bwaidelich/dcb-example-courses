@@ -38,20 +38,20 @@ Feature: Updating the capacity of a course
     Given course "c1" exists with a capacity of 3
     When course "c1" capacity is changed to 4
     Then the following events should be read:
-      | Type            | Domain Ids         |
-      | "CourseCreated" | [{"course": "c1"}] |
+      | Type            | Tags               |
+      | "CourseCreated" | ["course:c1"] |
     And the command should pass without errors
     And the following event should be appended:
-      | Type                    | Data                                 | Domain Ids         |
-      | "CourseCapacityChanged" | {"courseId": "c1", "newCapacity": 4} | [{"course": "c1"}] |
+      | Type                    | Data                                 | Tags          |
+      | "CourseCapacityChanged" | {"courseId": "c1", "newCapacity": 4} | ["course:c1"] |
 
   Scenario: Changing capacity of a course to a lower value
     Given course "c1" exists with a capacity of 4
     When course "c1" capacity is changed to 3
     Then the following events should be read:
-      | Type            | Domain Ids         |
-      | "CourseCreated" | [{"course": "c1"}] |
+      | Type            | Tags               |
+      | "CourseCreated" | ["course:c1"] |
     And the command should pass without errors
     And the following event should be appended:
-      | Type                    | Data                                 | Domain Ids         |
-      | "CourseCapacityChanged" | {"courseId": "c1", "newCapacity": 3} | [{"course": "c1"}] |
+      | Type                    | Data                                 | Tags          |
+      | "CourseCapacityChanged" | {"courseId": "c1", "newCapacity": 3} | ["course:c1"] |

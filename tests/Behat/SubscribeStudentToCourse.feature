@@ -60,19 +60,19 @@ Feature: Subscribing students to courses
     And student "s1" is subscribed to courses "c1,c2,c3,c4,c5,c6,c7,c8,c9"
     When student "s1" subscribes to course "c10"
     Then the following events should be read:
-      | Type                        | Domain Ids                            |
-      | "CourseCreated"             | [{"course": "c10"}]                   |
-      | "StudentRegistered"         | [{"student": "s1"}]                   |
-      | "StudentSubscribedToCourse" | [{"course": "c1"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c2"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c3"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c4"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c5"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c6"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c7"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c8"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c9"}, {"student": "s1"}] |
+      | Type                        | Tags                        |
+      | "CourseCreated"             | ["course:c10"]              |
+      | "StudentRegistered"         | ["student:s1"]              |
+      | "StudentSubscribedToCourse" | ["course:c1", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c2", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c3", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c4", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c5", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c6", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c7", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c8", "student:s1"] |
+      | "StudentSubscribedToCourse" | ["course:c9", "student:s1"] |
     Then the command should pass without errors
     And the following event should be appended:
-      | Type                        | Data                                   | Domain Ids                             |
-      | "StudentSubscribedToCourse" | {"courseId": "c10", "studentId": "s1"} | [{"course": "c10"}, {"student": "s1"}] |
+      | Type                        | Data                                   | Tags                         |
+      | "StudentSubscribedToCourse" | {"courseId": "c10", "studentId": "s1"} | ["course:c10", "student:s1"] |

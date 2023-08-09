@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Event\Normalizer;
+namespace Wwwision\DCBExample;
 
 use JsonException;
 use RuntimeException;
 use Webmozart\Assert\Assert;
-use Wwwision\DCBEventStore\Model\DomainEvent;
-use Wwwision\DCBEventStore\Model\Event;
-use Wwwision\DCBEventStore\Model\EventData;
-use Wwwision\DCBEventStore\Model\EventEnvelope;
-use Wwwision\DCBEventStore\Model\EventId;
-use Wwwision\DCBEventStore\Model\EventType;
+use Wwwision\DCBEventStore\Types\Event;
+use Wwwision\DCBEventStore\Types\EventData;
+use Wwwision\DCBEventStore\Types\EventEnvelope;
+use Wwwision\DCBEventStore\Types\EventId;
+use Wwwision\DCBEventStore\Types\EventType;
+use Wwwision\DCBExample\Events\DomainEvent;
 
 use function get_debug_type;
 use function json_decode;
@@ -24,7 +24,7 @@ use function substr;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * Simple converter that expects Domain Events to implement the {@see FromArraySupport} interface
+ * Simple converter that expects Domain Events to implement the {@see DomainEvent} interface
  */
 final readonly class EventNormalizer
 {
@@ -39,10 +39,10 @@ final readonly class EventNormalizer
             throw new RuntimeException(sprintf('Failed to decode JSON: %s', $e->getMessage()), 1684510536, $e);
         }
         Assert::isArray($payload);
-        /** @var class-string<FromArraySupport> $eventClassName
+        /** @var class-string<DomainEvent> $eventClassName
          * @noinspection PhpRedundantVariableDocTypeInspection
          */
-        $eventClassName = '\\Wwwision\\DCBExample\\Event\\' . $event->type->value;
+        $eventClassName = '\\Wwwision\\DCBExample\\Events\\' . $event->type->value;
         $domainEvent = $eventClassName::fromArray($payload);
         Assert::isInstanceOf($domainEvent, DomainEvent::class);
         return $domainEvent;
@@ -59,7 +59,7 @@ final readonly class EventNormalizer
             EventId::create(),
             EventType::fromString(substr($domainEvent::class, strrpos($domainEvent::class, '\\') + 1)),
             EventData::fromString($eventData),
-            $domainEvent->domainIds(),
+            $domainEvent->tags(),
         );
     }
 }

@@ -4,15 +4,19 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Event\Normalizer;
+namespace Wwwision\DCBExample\Events;
+
+use Wwwision\DCBEventStore\Types\Tags;
 
 /**
- * Contract for classes (usually Domain Events) with a static fromArray() constructor
+ * Contract for Domain Events classes
  */
-interface FromArraySupport
+interface DomainEvent
 {
     /**
      * @param array<mixed> $data
      */
     public static function fromArray(array $data): self;
+
+    public function tags(): Tags;
 }

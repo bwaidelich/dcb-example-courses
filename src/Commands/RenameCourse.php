@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Command;
+namespace Wwwision\DCBExample\Commands;
 
-use Wwwision\DCBExample\Model\CourseId;
-use Wwwision\DCBExample\Model\CourseTitle;
+use Wwwision\DCBExample\Types\CourseId;
+use Wwwision\DCBExample\Types\CourseTitle;
 
 /**
- * Command to change the title of a course
+ * Commands to change the title of a course
  */
 final readonly class RenameCourse implements Command
 {

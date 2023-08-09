@@ -6,48 +6,58 @@ namespace Wwwision\DCBExample\Tests\Behat\Bootstrap;
 use Behat\Behat\Context\Context;
 use Behat\Gherkin\Node\PyStringNode;
 use Behat\Gherkin\Node\TableNode;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\DBAL\Platforms\SqlitePlatform;
 use InvalidArgumentException;
-use Wwwision\DCBEventStore\EventStream;
-use Wwwision\DCBExample\Exception\ConstraintException;
-use Wwwision\DCBEventStore\Model\DomainEvent;
-use Wwwision\DCBEventStore\Model\Event;
-use Wwwision\DCBEventStore\Model\EventEnvelope;
-use Wwwision\DCBEventStore\Model\EventId;
-use Wwwision\DCBEventStore\Model\Events;
-use Wwwision\DCBEventStore\Model\ExpectedLastEventId;
-use Wwwision\DCBEventStore\Model\StreamQuery;
-use Wwwision\DCBExample\Command\Command;
-use Wwwision\DCBExample\Command\CreateCourse;
-use Wwwision\DCBExample\Command\RegisterStudent;
-use Wwwision\DCBExample\Command\RenameCourse;
-use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
-use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
-use Wwwision\DCBExample\Command\UpdateCourseCapacity;
-use Wwwision\DCBExample\CommandHandler;
-use Wwwision\DCBExample\Event\CourseCreated;
-use Wwwision\DCBExample\Event\Normalizer\EventNormalizer;
-use Wwwision\DCBExample\Event\StudentRegistered;
-use Wwwision\DCBExample\Event\StudentSubscribedToCourse;
-use Wwwision\DCBExample\Event\StudentUnsubscribedFromCourse;
-use Wwwision\DCBExample\Model\CourseCapacity;
-use Wwwision\DCBExample\Model\CourseId;
-use Wwwision\DCBExample\Model\CourseTitle;
-use Wwwision\DCBExample\Model\StudentId;
-use Wwwision\DCBEventStore\EventStore;
-use Wwwision\DCBEventStore\Helper\InMemoryEventStore;
 use PHPUnit\Framework\Assert;
+use RuntimeException;
+use Throwable;
+use Wwwision\DCBEventStore\EventStore;
+use Wwwision\DCBEventStore\EventStream;
+use Wwwision\DCBEventStore\Helpers\InMemoryEventStore;
+use Wwwision\DCBEventStore\Helpers\InMemoryEventStream;
+use Wwwision\DCBEventStore\Types\AppendCondition;
+use Wwwision\DCBEventStore\Types\Event;
+use Wwwision\DCBEventStore\Types\Events;
+use Wwwision\DCBEventStore\Types\SequenceNumber;
+use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
+use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
+use Wwwision\DCBExample\CommandHandler;
+use Wwwision\DCBExample\Commands\Command;
+use Wwwision\DCBExample\Commands\CreateCourse;
+use Wwwision\DCBExample\Commands\RegisterStudent;
+use Wwwision\DCBExample\Commands\RenameCourse;
+use Wwwision\DCBExample\Commands\SubscribeStudentToCourse;
+use Wwwision\DCBExample\Commands\UnsubscribeStudentFromCourse;
+use Wwwision\DCBExample\Commands\UpdateCourseCapacity;
+use Wwwision\DCBExample\Events\CourseCreated;
+use Wwwision\DCBExample\Events\DomainEvent;
+use Wwwision\DCBExample\EventNormalizer;
+use Wwwision\DCBExample\Events\StudentRegistered;
+use Wwwision\DCBExample\Events\StudentSubscribedToCourse;
+use Wwwision\DCBExample\Events\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\Exception\ConstraintException;
+use Wwwision\DCBExample\Types\CourseCapacity;
+use Wwwision\DCBExample\Types\CourseId;
+use Wwwision\DCBExample\Types\CourseTitle;
+use Wwwision\DCBExample\Types\StudentId;
 use function array_diff;
 use function array_keys;
 use function array_map;
 use function explode;
+use function func_get_args;
+use function get_debug_type;
 use function implode;
 use function json_decode;
+use function reset;
 use function sprintf;
-use function var_dump;
 use const JSON_THROW_ON_ERROR;
 
 final class FeatureContext implements Context
 {
+    private Connection $eventStoreConnection;
     private EventStore $eventStore;
 
     private CommandHandler $commandHandler;
@@ -55,10 +65,14 @@ final class FeatureContext implements Context
 
     private ?ConstraintException $lastConstraintException = null;
 
-    public function __construct()
+    public function __construct(string $eventStoreDsn = null, private string $eventTableName = 'dcb_events_test')
     {
-        $innerEventStore = InMemoryEventStore::create();
+        $this->eventStoreConnection = DriverManager::getConnection(['url' => $eventStoreDsn ?? 'pdo-sqlite://:memory:']);
 
+        /** The second parameter is the table name to store the events in **/
+        $innerEventStore = DoctrineEventStore::create($this->eventStoreConnection, $eventTableName);
+        $innerEventStore->setup();
+        $this->resetEventStore();
         $this->eventStore = new class ($innerEventStore) implements EventStore {
 
             public Events $appendedEvents;
@@ -74,34 +88,32 @@ final class FeatureContext implements Context
                 $this->inner->setup();
             }
 
-            public function streamAll(): EventStream
+            public function read(StreamQuery $query, ?SequenceNumber $from = null): EventStream
             {
-                $innerStream = $this->inner->streamAll();
+                $innerStream = $this->inner->read($query, $from);
+                $eventEnvelopes = [];
                 foreach ($innerStream as $eventEnvelope) {
                     $this->readEvents = $this->readEvents->append($eventEnvelope->event);
+                    $eventEnvelopes[] = $eventEnvelope;
                 }
-                return $innerStream;
+                return InMemoryEventStream::create(...$eventEnvelopes);
+
             }
 
-            public function stream(StreamQuery $query): EventStream
+            public function readBackwards(StreamQuery $query, ?SequenceNumber $from = null): EventStream
             {
-                $innerStream = $this->inner->stream($query);
+                $innerStream = $this->inner->readBackwards($query, $from);
+                $eventEnvelopes = [];
                 foreach ($innerStream as $eventEnvelope) {
                     $this->readEvents = $this->readEvents->append($eventEnvelope->event);
+                    $eventEnvelopes[] = $eventEnvelope;
                 }
-                return $innerStream;
+                return InMemoryEventStream::create(...$eventEnvelopes);
             }
 
-            public function append(Events $events): void
+            public function append(Events $events, AppendCondition $condition): void
             {
-                $this->appendedEvents = $events;
-                $this->inner->append($events);
-            }
-
-
-            public function conditionalAppend(Events $events, StreamQuery $query, ExpectedLastEventId $expectedLastEventId): void
-            {
-                $this->inner->conditionalAppend($events, $query, $expectedLastEventId);
+                $this->inner->append($events, $condition);
                 $this->appendedEvents = $events;
             }
         };
@@ -116,6 +128,22 @@ final class FeatureContext implements Context
     {
         if ($this->lastConstraintException !== null) {
             throw $this->lastConstraintException;
+        }
+    }
+
+    /**
+     * @AfterScenario
+     */
+    public function resetEventStore(): void
+    {
+        if ($this->eventStoreConnection->getDatabasePlatform() instanceof PostgreSQLPlatform) {
+            $this->eventStoreConnection->executeStatement('TRUNCATE TABLE ' . $this->eventTableName . ' RESTART IDENTITY');
+        } elseif ($this->eventStoreConnection->getDatabasePlatform() instanceof SqlitePlatform) {
+            /** @noinspection SqlWithoutWhere */
+            $this->eventStoreConnection->executeStatement('DELETE FROM ' . $this->eventTableName);
+            $this->eventStoreConnection->executeStatement('DELETE FROM sqlite_sequence WHERE name =\'' . $this->eventTableName . '\'');
+        } else {
+            $this->eventStoreConnection->executeStatement('TRUNCATE TABLE ' . $this->eventTableName);
         }
     }
 
@@ -317,7 +345,7 @@ final class FeatureContext implements Context
         $actualEvents = [];
         $index = 0;
         foreach ($events as $event) {
-            $actualEvents[] = self::eventToArray(isset($expectedEvents[$index]) ? array_keys($expectedEvents[$index]) : ['Id', 'Type', 'Data', 'Domain Ids'], $event);
+            $actualEvents[] = self::eventToArray(isset($expectedEvents[$index]) ? array_keys($expectedEvents[$index]) : ['Id', 'Type', 'Data', 'Tags'], $event);
             $index ++;
         }
         Assert::assertEquals($expectedEvents, $actualEvents);
@@ -325,7 +353,7 @@ final class FeatureContext implements Context
 
     private static function eventToArray(array $keys, Event $event): array
     {
-        $supportedKeys = ['Id', 'Type', 'Data', 'Domain Ids'];
+        $supportedKeys = ['Id', 'Type', 'Data', 'Tags'];
         $unsupportedKeys = array_diff($keys, $supportedKeys);
         if ($unsupportedKeys !== []) {
             throw new InvalidArgumentException(sprintf('Invalid key(s) "%s" for expected event. Allowed keys are: "%s"', implode('", "', $unsupportedKeys), implode('", "', $supportedKeys)), 1686128517);
@@ -334,7 +362,7 @@ final class FeatureContext implements Context
             'Id' => $event->id->value,
             'Type' => $event->type->value,
             'Data' => json_decode($event->data->value, true, 512, JSON_THROW_ON_ERROR),
-            'Domain Ids' => $event->domainIds->toArray(),
+            'Tags' => $event->tags->toSimpleArray(),
         ];
         foreach (array_diff($supportedKeys, $keys) as $unusedKey) {
             unset($actualAsArray[$unusedKey]);
@@ -357,7 +385,7 @@ final class FeatureContext implements Context
 
     private function appendEvents(DomainEvent ...$domainEvents): void
     {
-        $this->eventStore->append(Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), $domainEvents)));
+        $this->eventStore->append(Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), $domainEvents)), AppendCondition::noConstraints());
     }
 
 

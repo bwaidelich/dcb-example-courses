@@ -1,5 +1,5 @@
 {
-  "name": "wwwision/dcb-example",
+  "name": "wwwision/dcb-example-courses",
   "description": "Simple example for the Dynamic Consistency Boundary pattern described by Sara Pellegrini",
   "type": "project",
   "license": "MIT",
@@ -28,15 +28,14 @@
     "php": ">=8.2",
     "ramsey/uuid": "^4.7",
     "webmozart/assert": "^1.11",
-    "wwwision/dcb-eventstore": "^2.0",
-    "wwwision/dcb-eventstore-doctrine": "^2.0",
-    "spatie/async": "^1.5"
+    "wwwision/dcb-eventstore": "^2",
+    "wwwision/dcb-eventstore-doctrine": "^2"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
     "phpstan/phpstan": "^1.10",
     "squizlabs/php_codesniffer": "^4.0.x-dev",
-    "phpunit/phpunit": "^10.1",
+    "phpunit/phpunit": "^10.2",
     "behat/behat": "^3.13"
   },
   "autoload": {
@@ -53,12 +52,10 @@
     "test-phpstan": "phpstan",
     "test-cs": "phpcs --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
     "test-cs:fix": "phpcbf --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
-    "test-unit": "phpunit tests",
     "test-behat": "behat",
     "test": [
       "@test-phpstan",
       "@test-cs",
-      "@test-unit",
       "@test-behat"
     ]
   }

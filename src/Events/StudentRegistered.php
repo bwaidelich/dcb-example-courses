@@ -2,18 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Event;
+namespace Wwwision\DCBExample\Events;
 
-use Wwwision\DCBExample\Event\Normalizer\FromArraySupport;
-use Wwwision\DCBExample\Model\StudentId;
-use Wwwision\DCBEventStore\Model\DomainEvent;
-use Wwwision\DCBEventStore\Model\DomainIds;
 use Webmozart\Assert\Assert;
+use Wwwision\DCBEventStore\Types\Tags;
+use Wwwision\DCBExample\Types\StudentId;
 
 /**
- * Domain Event that occurs when a new student was registered in the system
+ * Domain Events that occurs when a new student was registered in the system
  */
-final readonly class StudentRegistered implements DomainEvent, FromArraySupport
+final readonly class StudentRegistered implements DomainEvent
 {
     public function __construct(
         public StudentId $studentId,
@@ -32,8 +30,8 @@ final readonly class StudentRegistered implements DomainEvent, FromArraySupport
         );
     }
 
-    public function domainIds(): DomainIds
+    public function tags(): Tags
     {
-        return DomainIds::create($this->studentId);
+        return Tags::create($this->studentId->toTag());
     }
 }

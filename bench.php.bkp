@@ -1,0 +1,215 @@
+<?php
+declare(strict_types=1);
+
+use Doctrine\DBAL\DriverManager;
+use Spatie\Async\Pool;
+use Wwwision\DCBEventStore\Exceptions\ConditionalAppendFailed;
+use Wwwision\DCBExample\Exception\ConstraintException;
+use Wwwision\DCBEventStore\Types\DomainIds;
+use Wwwision\DCBEventStore\Types\EventData;
+use Wwwision\DCBEventStore\Types\EventEnvelope;
+use Wwwision\DCBEventStore\Types\EventId;
+use Wwwision\DCBEventStore\Types\Events;
+use Wwwision\DCBEventStore\Types\EventType;
+use Wwwision\DCBEventStore\Types\EventTypes;
+use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
+use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
+use Wwwision\DCBExample\Commands\Command;
+use Wwwision\DCBExample\Commands\CreateCourse;
+use Wwwision\DCBExample\Commands\RegisterStudent;
+use Wwwision\DCBExample\Commands\RenameCourse;
+use Wwwision\DCBExample\Commands\SubscribeStudentToCourse;
+use Wwwision\DCBExample\Commands\UnsubscribeStudentFromCourse;
+use Wwwision\DCBExample\Commands\UpdateCourseCapacity;
+use Wwwision\DCBExample\CommandHandler;
+use Wwwision\DCBExample\Model\CourseCapacity;
+use Wwwision\DCBExample\Model\CourseId;
+use Wwwision\DCBExample\Model\CourseTitle;
+use Wwwision\DCBExample\Model\StudentId;
+
+require __DIR__ . '/vendor/autoload.php';
+
+$dsn = 'pdo-mysql://root:NwR2pEdKK@.UoUtHebFgH!br@127.0.0.1:3306/test?charset=utf8mb4';
+//$dsn = 'pdo-pgsql://bwaidelich@127.0.0.1:5432/dcb';
+//$dsn = 'pdo-sqlite:///events.sqlite';
+$connection = DriverManager::getConnection(['url' => $dsn]);
+$eventStore = DoctrineEventStore::create($connection, 'dcb_events');
+$eventStore->setup();
+echo 'resetting db...' . PHP_EOL;
+$connection->executeStatement('TRUNCATE TABLE dcb_events');
+//$connection->executeStatement('TRUNCATE TABLE dcb_events RESTART IDENTITY');
+//$connection->executeStatement('DELETE FROM dcb_events');
+echo 'done' . PHP_EOL;
+
+//$eventStore->append(Events::single(EventId::create(), EventType::fromString('SomeEvent'), EventData::fromString('test'), DomainIds::single('foo', 'bar')), StreamQuery::matchingIdsAndTypes(DomainIds::single('foo', 'bar'), EventTypes::single('SomeType')), null);
+////exit;
+////
+//foreach ($eventStore->stream(StreamQuery::matchingAny()) as $eventEnvelope) {
+//    var_dump($eventEnvelope);
+//}
+//echo PHP_EOL . 'done' . PHP_EOL;
+//exit;
+//
+
+echo 'appending events...' . PHP_EOL;
+
+$process = function () use ($dsn) {
+
+    $rand = static fn (int $percentage) => random_int(1, 100) < $percentage;
+    $connection = DriverManager::getConnection(['url' => $dsn]);
+    $eventStore = DoctrineEventStore::create($connection, 'dcb_events');
+    /** @var {@see CommandHandler} is the central authority to handle {@see Command}s */
+    $commandHandler = new CommandHandler($eventStore);
+    $constraintViolations = 0;
+
+    $handle = function (Command $command) use ($commandHandler, &$constraintViolations) {
+        //echo $command::class . PHP_EOL;
+        try {
+            $commandHandler->handle($command);
+        } catch (ConditionalAppendFailed|ConstraintException $e) {
+            $constraintViolations ++;
+            //echo 'CONSTRAINT EXCEPTION: ' . $e->getMessage() . PHP_EOL;
+        }
+    };
+
+    for ($i = 0; $i < 100; $i++) {
+
+        $courseId = CourseId::fromString('c' . random_int(1, 5));
+        $studentId = StudentId::fromString('s' . random_int(1, 5));
+        $capacity = CourseCapacity::fromInteger(random_int(1, 10));
+
+
+        if ($rand(80)) {
+            $handle(new CreateCourse($courseId, $capacity, CourseTitle::fromString((string)getmypid())));
+        }
+        if ($rand(40)) {
+            $handle(new RenameCourse($courseId, CourseTitle::fromString('Course renamed ' . md5(random_bytes(5)))));
+        }
+        if ($rand(80)) {
+            $handle(new RegisterStudent($studentId));
+        }
+
+        if ($rand(50)) {
+            $handle(new SubscribeStudentToCourse($courseId, $studentId));
+        }
+
+        if ($rand(20)) {
+            $handle(new UpdateCourseCapacity($courseId, $capacity));
+        }
+
+        if ($rand(10)) {
+            $handle(new UnsubscribeStudentFromCourse($courseId, $studentId));
+        }
+
+        //usleep(random_int(100, 10000));
+    }
+    return ['constraintViolations' => $constraintViolations];
+};
+//
+//$process();
+//die('DONE');
+
+$pool = Pool::create();
+for ($i = 0; $i < 20; $i ++) {
+    $pool->add($process)->then(function ($output) {
+        //echo 'OUTPUT:' . PHP_EOL;
+        //var_dump($output);
+    })->catch(function ($exception) {
+        echo 'EXCEPTION:' . PHP_EOL;
+        var_dump($exception);
+    })->timeout(function () {
+        echo 'TIMEOUT' . PHP_EOL;
+    });
+}
+$pool->wait();
+
+echo 'done' . PHP_EOL;
+echo 'checking inconsistencies...' . PHP_EOL;
+
+$courses = [];
+$students = [];
+
+function fail(EventEnvelope $eventEnvelope, string $message, ...$args) {
+    throw new RuntimeException(sprintf('ERROR at sequence number ' . $eventEnvelope->sequenceNumber->value . ': ' . $message, ...$args));
+}
+
+$numberOfEvents = 0;
+
+foreach ($eventStore->streamAll() as $eventEnvelope) {
+    $payload = json_decode($eventEnvelope->event->data->value, true, 512, JSON_THROW_ON_ERROR);
+    $courseId = $payload['courseId'] ?? null;
+    $studentId = $payload['studentId'] ?? null;
+    $numberOfEvents ++;
+
+    switch ($eventEnvelope->event->type->value) {
+        case 'CourseCreated':
+            if (isset($courses[$courseId])) {
+                fail($eventEnvelope, 'Course "%s" already exists', $courseId);
+            }
+            $courses[$courseId] = [
+                'title' => $payload['courseTitle'],
+                'capacity' => $payload['initialCapacity'],
+                'subscriptions' => 0,
+            ];
+            break;
+        case 'CourseRenamed':
+            if (!isset($courses[$courseId])) {
+                fail($eventEnvelope, 'Course "%s" does not exist', $courseId);
+            }
+            if ($courses[$courseId]['title'] === $payload['newCourseTitle']) {
+                fail($eventEnvelope, 'Course title of "%s" did not change', $courseId);
+            }
+            $courses[$courseId]['title'] = $payload['newCourseTitle'];
+            break;
+        case 'StudentRegistered':
+            if (isset($students[$studentId])) {
+                fail($eventEnvelope, 'Student "%s" already exists', $studentId);
+            }
+            $students[$studentId] = [
+                'courses' => []
+            ];
+            break;
+        case 'StudentSubscribedToCourse':
+            if (!isset($courses[$courseId])) {
+                fail($eventEnvelope, 'Course "%s" does not exist', $courseId);
+            }
+            if (!isset($students[$studentId])) {
+                fail($eventEnvelope, 'Student "%s" does not exist', $studentId);
+            }
+            if (in_array($courseId, $students[$studentId]['courses'], true)) {
+                fail($eventEnvelope, 'Student "%s" already subscribed to course "%s"', $studentId, $courseId);
+            }
+            if ($courses[$courseId]['subscriptions'] >= $courses[$courseId]['capacity']) {
+                fail($eventEnvelope, 'Course "%s" capacity exceeded', $courseId);
+            }
+            $courses[$courseId]['subscriptions'] ++;
+            $students[$studentId]['courses'] = [...$students[$studentId]['courses'], $courseId];
+            break;
+        case 'CourseCapacityChanged':
+            if (!isset($courses[$courseId])) {
+                fail($eventEnvelope, 'Course "%s" does not exist', $courseId);
+            }
+            if ($courses[$courseId]['subscriptions'] > $payload['newCapacity']) {
+                fail($eventEnvelope, 'Course "%s" capacity cannot be changed because it already has more subscriptions', $courseId);
+            }
+            $courses[$courseId]['capacity'] = $payload['newCapacity'];
+            break;
+
+        case 'StudentUnsubscribedFromCourse':
+            if (!isset($courses[$courseId])) {
+                fail($eventEnvelope, 'Course "%s" does not exist', $courseId);
+            }
+            if (!isset($students[$studentId])) {
+                fail($eventEnvelope, 'Student "%s" does not exist', $studentId);
+            }
+            if (!in_array($courseId, $students[$studentId]['courses'], true)) {
+                fail($eventEnvelope, 'Student "%s" is not subscribed to course "%s"', $studentId, $courseId);
+            }
+            $courses[$courseId]['subscriptions'] --;
+            $students[$studentId]['courses'] = array_filter($students[$studentId]['courses'], static fn($c) => $c !== $courseId);
+            break;
+        default:
+            fail($eventEnvelope, 'Unexpected event type "%s"', $eventEnvelope->event->type->value);
+    }
+}
+printf('Checked %d events', $numberOfEvents);

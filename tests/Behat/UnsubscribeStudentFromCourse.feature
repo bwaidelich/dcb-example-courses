@@ -37,12 +37,11 @@ Feature: Unsubscribing students from courses
     And student "s2" is subscribed to course "c1"
     And student "s2" unsubscribes from course "c1"
     Then the following events should be read:
-      | Type                        | Domain Ids                            |
-      | "CourseCreated"             | [{"course": "c1"}]                    |
-      | "StudentRegistered"         | [{"student": "s2"}]                   |
-      | "StudentSubscribedToCourse" | [{"course": "c1"}, {"student": "s1"}] |
-      | "StudentSubscribedToCourse" | [{"course": "c1"}, {"student": "s2"}] |
+      | Type                        | Tags                        |
+      | "CourseCreated"             | ["course:c1"]               |
+      | "StudentRegistered"         | ["student:s2"]              |
+      | "StudentSubscribedToCourse" | ["course:c1", "student:s2"] |
     And the command should pass without errors
     And the following event should be appended:
-      | Type                            | Data                                  | Domain Ids                            |
-      | "StudentUnsubscribedFromCourse" | {"courseId": "c1", "studentId": "s2"} | [{"course": "c1"}, {"student": "s2"}] |
+      | Type                            | Data                                  | Tags                        |
+      | "StudentUnsubscribedFromCourse" | {"courseId": "c1", "studentId": "s2"} | ["course:c1", "student:s2"] |

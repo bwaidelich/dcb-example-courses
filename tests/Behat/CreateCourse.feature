@@ -15,5 +15,5 @@ Feature: Creating courses
     Then no events should be read
     And the command should pass without errors
     And the following event should be appended:
-      | Type            | Data                                                                    | Domain Ids         |
-      | "CourseCreated" | {"courseId": "c2", "initialCapacity": "10", "courseTitle": "course 02"} | [{"course": "c2"}] |
+      | Type            | Data                                                                    | Tags          |
+      | "CourseCreated" | {"courseId": "c2", "initialCapacity": "10", "courseTitle": "course 02"} | ["course:c2"] |

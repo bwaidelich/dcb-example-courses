@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Command;
+namespace Wwwision\DCBExample\Commands;
 
-use Wwwision\DCBExample\Model\CourseCapacity;
-use Wwwision\DCBExample\Model\CourseId;
+use Wwwision\DCBExample\Types\CourseCapacity;
+use Wwwision\DCBExample\Types\CourseId;
 
 /**
- * Command to change the total capacity of a course
+ * Commands to change the total capacity of a course
  */
 final readonly class UpdateCourseCapacity implements Command
 {

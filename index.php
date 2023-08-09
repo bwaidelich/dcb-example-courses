@@ -2,20 +2,20 @@
 declare(strict_types=1);
 
 use Doctrine\DBAL\DriverManager;
-use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
-use Wwwision\DCBExample\Command\Command;
-use Wwwision\DCBExample\Command\CreateCourse;
-use Wwwision\DCBExample\Command\RegisterStudent;
-use Wwwision\DCBExample\Command\RenameCourse;
-use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
-use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
-use Wwwision\DCBExample\Command\UpdateCourseCapacity;
-use Wwwision\DCBExample\CommandHandler;
-use Wwwision\DCBExample\Model\CourseCapacity;
-use Wwwision\DCBExample\Model\CourseId;
-use Wwwision\DCBExample\Model\CourseTitle;
-use Wwwision\DCBExample\Model\StudentId;
 use Wwwision\DCBEventStore\EventStore;
+use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
+use Wwwision\DCBExample\CommandHandler;
+use Wwwision\DCBExample\Commands\Command;
+use Wwwision\DCBExample\Commands\CreateCourse;
+use Wwwision\DCBExample\Commands\RegisterStudent;
+use Wwwision\DCBExample\Commands\RenameCourse;
+use Wwwision\DCBExample\Commands\SubscribeStudentToCourse;
+use Wwwision\DCBExample\Commands\UnsubscribeStudentFromCourse;
+use Wwwision\DCBExample\Commands\UpdateCourseCapacity;
+use Wwwision\DCBExample\Types\CourseCapacity;
+use Wwwision\DCBExample\Types\CourseId;
+use Wwwision\DCBExample\Types\CourseTitle;
+use Wwwision\DCBExample\Types\StudentId;
 
 require __DIR__ . '/vendor/autoload.php';
 
@@ -25,7 +25,7 @@ $connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:']);
 /** The second parameter is the table name to store the events in **/
 $eventStore = DoctrineEventStore::create($connection, 'dcb_events');
 
-/** The {@see EventStore::setup() method is used to make sure that the Event Store backend is set up (i.e. required tables are created and their schema up-to-date) **/
+/** The {@see EventStore::setup()} method is used to make sure that the Events Store backend is set up (i.e. required tables are created and their schema up-to-date) **/
 $eventStore->setup();
 
 /** @var {@see CommandHandler} is the central authority to handle {@see Command}s */

@@ -4,7 +4,9 @@ default:
   suites:
     default:
       paths: ['%paths.base%/tests/Behat']
-      contexts: [Wwwision\DCBExample\Tests\Behat\Bootstrap\FeatureContext]
+      contexts:
+        - Wwwision\DCBExample\Tests\Behat\Bootstrap\FeatureContext:
+            eventStoreDsn: 'pdo-pgsql://bwaidelich@127.0.0.1:5432/dcb'
   formatters:
     pretty: false
     progress: true
