@@ -4,16 +4,8 @@ declare(strict_types=1);
 
 namespace Wwwision\DCBExample;
 
-use Closure;
 use RuntimeException;
-use stdClass;
 use Wwwision\DCBEventStore\EventStore;
-use Wwwision\DCBEventStore\Types\AppendCondition;
-use Wwwision\DCBEventStore\Types\Events;
-use Wwwision\DCBEventStore\Types\ExpectedHighestSequenceNumber;
-use Wwwision\DCBEventStore\Types\StreamQuery\Criteria;
-use Wwwision\DCBEventStore\Types\StreamQuery\Criteria\EventTypesAndTagsCriterion;
-use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
 use Wwwision\DCBEventStore\Types\Tags;
 use Wwwision\DCBExample\Commands\Command;
 use Wwwision\DCBExample\Commands\CreateCourse;
@@ -28,30 +20,30 @@ use Wwwision\DCBExample\Events\CourseRenamed;
 use Wwwision\DCBExample\Events\StudentRegistered;
 use Wwwision\DCBExample\Events\StudentSubscribedToCourse;
 use Wwwision\DCBExample\Events\StudentUnsubscribedFromCourse;
-use Wwwision\DCBExample\Exception\ConstraintException;
-use Wwwision\DCBExample\Projections\GenericProjection;
-use Wwwision\DCBExample\Projections\Projection;
-use Wwwision\DCBExample\Projections\ProjectionLogic;
 use Wwwision\DCBExample\Types\CourseCapacity;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\CourseIds;
 use Wwwision\DCBExample\Types\CourseTitle;
 use Wwwision\DCBExample\Types\StudentId;
-use function array_map;
-use function is_array;
+use Wwwision\DCBLibrary\Adapters\SynchronousCatchUpQueue;
+use Wwwision\DCBLibrary\EventHandling\EventHandlers;
+use Wwwision\DCBLibrary\EventPublisher;
+use Wwwision\DCBLibrary\Exceptions\ConstraintException;
+use Wwwision\DCBLibrary\Projection\CompositeProjection;
+use Wwwision\DCBLibrary\Projection\InMemoryProjection;
+use Wwwision\DCBLibrary\Projection\Projection;
 use function sprintf;
 
 /**
  * Main authority of this package, responsible to handle incoming {@see Command}s (@see self::handle()}
  */
-final readonly class CommandHandler
+final readonly class App
 {
-    private EventNormalizer $eventNormalizer;
+    private EventPublisher $eventPublisher;
 
-    public function __construct(
-        private EventStore $eventStore,
-    ) {
-        $this->eventNormalizer = new EventNormalizer();
+    public function __construct(EventStore $eventStore)
+    {
+        $this->eventPublisher = new EventPublisher($eventStore, new EventSerializer(), new SynchronousCatchUpQueue($eventStore, EventHandlers::create()));
     }
 
     public function handle(Command $command): void
@@ -69,10 +61,8 @@ final readonly class CommandHandler
 
     private function handleCreateCourse(CreateCourse $command): void
     {
-        $this->transactional([
-            'courseExists' => self::courseExists($command->courseId),
-        ], function ($state) use ($command) {
-            if ($state->courseExists) {
+        $this->eventPublisher->conditionalAppend(self::courseExists($command->courseId), function (bool $courseExists) use ($command) {
+            if ($courseExists) {
                 throw new ConstraintException(sprintf('Failed to create course with id "%s" because a course with that id already exists', $command->courseId->value), 1684593925);
             }
             return new CourseCreated($command->courseId, $command->initialCapacity, $command->courseTitle);
@@ -81,10 +71,10 @@ final readonly class CommandHandler
 
     private function handleRenameCourse(RenameCourse $command): void
     {
-        $this->transactional([
+        $this->eventPublisher->conditionalAppend(CompositeProjection::create([
             'courseExists' => self::courseExists($command->courseId),
             'courseTitle' => self::courseTitle($command->courseId),
-        ], function ($state) use ($command) {
+        ]), function ($state) use ($command) {
             if (!$state->courseExists) {
                 throw new ConstraintException(sprintf('Failed to rename course with id "%s" because a course with that id does not exist', $command->courseId->value), 1684509782);
             }
@@ -97,10 +87,8 @@ final readonly class CommandHandler
 
     private function handleRegisterStudent(RegisterStudent $command): void
     {
-        $this->transactional([
-            'studentRegistered' => self::studentRegistered($command->studentId),
-        ], function ($state) use ($command) {
-            if ($state->studentRegistered) {
+        $this->eventPublisher->conditionalAppend(self::studentRegistered($command->studentId), function (bool $studentRegistered) use ($command) {
+            if ($studentRegistered) {
                 throw new ConstraintException(sprintf('Failed to register student with id "%s" because a student with that id already exists', $command->studentId->value), 1684579300);
             }
             return new StudentRegistered($command->studentId);
@@ -109,13 +97,13 @@ final readonly class CommandHandler
 
     private function handleSubscribeStudentToCourse(SubscribeStudentToCourse $command): void
     {
-        $this->transactional([
+        $this->eventPublisher->conditionalAppend(CompositeProjection::create([
             'studentRegistered' => self::studentRegistered($command->studentId),
             'courseExists' => self::courseExists($command->courseId),
             'courseCapacity' => self::courseCapacity($command->courseId),
             'numberOfCourseSubscriptions' => self::numberOfCourseSubscriptions($command->courseId),
             'studentSubscriptions' => self::studentSubscriptions($command->studentId),
-        ], function ($state) use ($command) {
+        ]), function ($state) use ($command) {
             if (!$state->studentRegistered) {
                 throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a student with that id does not exist', $command->studentId->value, $command->courseId->value), 1686914105);
             }
@@ -138,11 +126,11 @@ final readonly class CommandHandler
 
     private function handleUnsubscribeStudentFromCourse(UnsubscribeStudentFromCourse $command): void
     {
-        $this->transactional([
+        $this->eventPublisher->conditionalAppend(CompositeProjection::create([
             'courseExists' => self::courseExists($command->courseId),
             'studentRegistered' => self::studentRegistered($command->studentId),
             'studentSubscriptions' => self::studentSubscriptions($command->studentId),
-        ], function ($state) use ($command) {
+        ]), function ($state) use ($command) {
             if (!$state->courseExists) {
                 throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1684579448);
             }
@@ -158,11 +146,11 @@ final readonly class CommandHandler
 
     private function handleUpdateCourseCapacity(UpdateCourseCapacity $command): void
     {
-        $this->transactional([
+        $this->eventPublisher->conditionalAppend(CompositeProjection::create([
             'courseExists' => self::courseExists($command->courseId),
             'courseCapacity' => self::courseCapacity($command->courseId),
             'numberOfCourseSubscriptions' => self::numberOfCourseSubscriptions($command->courseId),
-        ], function ($state) use ($command) {
+        ]), function ($state) use ($command) {
             if (!$state->courseExists) {
                 throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because a course with that id does not exist', $command->courseId->value, $command->newCapacity->value), 1684604283);
             }
@@ -183,108 +171,86 @@ final readonly class CommandHandler
      */
     private static function courseExists(CourseId $courseId): Projection
     {
-        return new GenericProjection(
+        return InMemoryProjection::create(
             Tags::create($courseId->toTag()),
-            (new ProjectionLogic(false))
-                ->when(CourseCreated::class, static fn() => true)
+            [
+                CourseCreated::class => static fn () => true,
+            ],
+            false
         );
     }
 
     /**
-     * @param CourseId $courseId
      * @return Projection<CourseCapacity>
      */
     private static function courseCapacity(CourseId $courseId): Projection
     {
-        return new GenericProjection(
+        return InMemoryProjection::create(
             Tags::create($courseId->toTag()),
-            (new ProjectionLogic(CourseCapacity::fromInteger(0)))
-                ->when(CourseCreated::class, static fn($_, CourseCreated $event) => $event->initialCapacity)
-                ->when(CourseCapacityChanged::class, static fn($_, CourseCapacityChanged $event) => $event->newCapacity)
+            [
+                CourseCreated::class => static fn($_, CourseCreated $event) => $event->initialCapacity,
+                CourseCapacityChanged::class => static fn($_, CourseCapacityChanged $event) => $event->newCapacity,
+            ],
+            CourseCapacity::fromInteger(0)
         );
     }
 
     /**
-     * @param CourseId $courseId
-     * @return Projection<CourseCapacity>
+     * @return Projection<int>
      */
     private static function numberOfCourseSubscriptions(CourseId $courseId): Projection
     {
-        return new GenericProjection(
+        return InMemoryProjection::create(
             Tags::create($courseId->toTag()),
-            (new ProjectionLogic(0))
-                ->when(StudentSubscribedToCourse::class, static fn(int $state) => $state + 1)
-                ->when(StudentUnsubscribedFromCourse::class, static fn(int $state) => $state - 1)
+            [
+                StudentSubscribedToCourse::class => static fn(int $state) => $state + 1,
+                StudentUnsubscribedFromCourse::class => static fn(int $state) => $state - 1,
+            ],
+            0
         );
     }
 
     /**
-     * @param CourseId $courseId
      * @return Projection<CourseTitle>
      */
     private static function courseTitle(CourseId $courseId): Projection
     {
-        /** @var ProjectionLogic<CourseTitle> $logic */
-        $logic = (new ProjectionLogic(CourseTitle::fromString('')))
-            ->when(CourseCreated::class, static fn ($_, CourseCreated $event) => $event->courseTitle)
-            ->when(CourseRenamed::class, static fn ($_, CourseRenamed $event) => $event->newCourseTitle);
-        return new GenericProjection(Tags::create($courseId->toTag()), $logic);
-    }
-
-    private static function studentRegistered(StudentId $studentId): Projection
-    {
-        return new GenericProjection(
-            Tags::create($studentId->toTag()),
-            (new ProjectionLogic(false))
-                ->when(StudentRegistered::class, static fn() => true)
+        return InMemoryProjection::create(
+            Tags::create($courseId->toTag()),
+            [
+                CourseCreated::class => static fn ($_, CourseCreated $event) => $event->courseTitle,
+                CourseRenamed::class => static fn ($_, CourseRenamed $event) => $event->newCourseTitle,
+            ],
+            CourseTitle::fromString('')
         );
     }
 
     /**
-     * @param StudentId $studentId
+     * @return Projection<bool>
+     */
+    private static function studentRegistered(StudentId $studentId): Projection
+    {
+        return InMemoryProjection::create(
+            Tags::create($studentId->toTag()),
+            [
+                StudentRegistered::class => static fn () => true,
+            ],
+            false
+        );
+    }
+
+    /**
      * @return Projection<CourseIds>
      */
     private static function studentSubscriptions(StudentId $studentId): Projection
     {
-        /** @var ProjectionLogic<bool> $logic */
-        $logic = (new ProjectionLogic(CourseIds::none()))
-            ->when(StudentSubscribedToCourse::class, static fn (CourseIds $state, StudentSubscribedToCourse $event) => $state->with($event->courseId))
-            ->when(StudentUnsubscribedFromCourse::class, static fn (CourseIds $state, StudentUnsubscribedFromCourse $event) => $state->without($event->courseId));
-
-        return new GenericProjection(Tags::create($studentId->toTag()), $logic);
-    }
-
-    /**
-     * @param array<string, Projection> $projections
-     */
-    private function transactional(array $projections, Closure $closure): void
-    {
-        $criteria = [];
-        foreach ($projections as $projection) {
-            $criteria[] = new EventTypesAndTagsCriterion($projection->eventTypes(), $projection->tags());
-        }
-        $query = StreamQuery::create(Criteria::fromArray($criteria));
-        $expectedHighestSequenceNumber = ExpectedHighestSequenceNumber::none();
-        foreach ($this->eventStore->read($query) as $eventEnvelope) {
-            $domainEvent = $this->eventNormalizer->convertEvent($eventEnvelope);
-            foreach ($projections as $projection) {
-                if (!$projection->eventTypes()->contain($eventEnvelope->event->type)) {
-                    continue;
-                }
-                if (!$domainEvent->tags()->containEvery($projection->tags())) {
-                    continue;
-                }
-                $projection->apply($domainEvent);
-            }
-            $expectedHighestSequenceNumber = ExpectedHighestSequenceNumber::fromSequenceNumber($eventEnvelope->sequenceNumber);
-        }
-        $state = new stdClass();
-        foreach ($projections as $key => $projection) {
-            $state->$key = $projection->getState();
-        }
-        $domainEvents = $closure($state);
-        $events = Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), is_array($domainEvents) ? $domainEvents : [$domainEvents]));
-        $this->eventStore->append($events, new AppendCondition($query, $expectedHighestSequenceNumber));
-
+        return InMemoryProjection::create(
+            Tags::create($studentId->toTag()),
+            [
+                StudentSubscribedToCourse::class => static fn (CourseIds $state, StudentSubscribedToCourse $event) => $state->with($event->courseId),
+                StudentUnsubscribedFromCourse::class => static fn (CourseIds $state, StudentUnsubscribedFromCourse $event) => $state->without($event->courseId),
+            ],
+            CourseIds::none(),
+        );
     }
 }

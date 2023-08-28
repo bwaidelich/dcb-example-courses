@@ -4,9 +4,11 @@ default:
   suites:
     default:
       paths: ['%paths.base%/tests/Behat']
+      parameters:
+        env(DCB_TEST_DSN): "foo"
       contexts:
         - Wwwision\DCBExample\Tests\Behat\Bootstrap\FeatureContext:
-            eventStoreDsn: 'pdo-pgsql://bwaidelich@127.0.0.1:5432/dcb'
+            eventStoreDsn: '%env(DCB_TEST_DSN)%'
   formatters:
     pretty: false
     progress: true
