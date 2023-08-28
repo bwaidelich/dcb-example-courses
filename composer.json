@@ -22,21 +22,34 @@
   "config": {
     "platform": {
       "php": "8.2"
+    },
+    "allow-plugins": {
+      "phpstan/extension-installer": true
     }
   },
   "require": {
     "php": ">=8.2",
+    "ext-mbstring": "*",
+    "ext-ctype": "*",
     "ramsey/uuid": "^4.7",
     "webmozart/assert": "^1.11",
-    "wwwision/dcb-eventstore": "^2",
-    "wwwision/dcb-eventstore-doctrine": "^2"
+    "wwwision/dcb-eventstore": "@dev",
+    "wwwision/dcb-eventstore-doctrine": "@dev",
+    "wwwision/dcb-library": "@dev"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
     "phpstan/phpstan": "^1.10",
     "squizlabs/php_codesniffer": "^4.0.x-dev",
     "phpunit/phpunit": "^10.2",
-    "behat/behat": "^3.13"
+    "behat/behat": "^3.13",
+    "wwwision/dcb-library-phpstanextension": "@dev",
+    "phpstan/extension-installer": "^1.3"
+  },
+  "replace": {
+    "symfony/polyfill-ctype": "*",
+    "symfony/polyfill-mbstring": "*",
+    "symfony/polyfill-73": "*"
   },
   "autoload": {
     "psr-4": {
@@ -50,8 +63,8 @@
   },
   "scripts": {
     "test-phpstan": "phpstan",
-    "test-cs": "phpcs --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
-    "test-cs:fix": "phpcbf --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
+    "test-cs": "phpcs --colors src",
+    "test-cs:fix": "phpcbf --colors src",
     "test-behat": "behat",
     "test": [
       "@test-phpstan",

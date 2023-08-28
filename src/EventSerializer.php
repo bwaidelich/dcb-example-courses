@@ -9,10 +9,11 @@ use RuntimeException;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\Types\Event;
 use Wwwision\DCBEventStore\Types\EventData;
-use Wwwision\DCBEventStore\Types\EventEnvelope;
-use Wwwision\DCBEventStore\Types\EventId;
-use Wwwision\DCBEventStore\Types\EventType;
 use Wwwision\DCBExample\Events\DomainEvent;
+use Wwwision\DCBLibrary\DomainEvent as BaseDomainEvent;
+use Wwwision\DCBEventStore\Types\EventId;
+use Wwwision\DCBEventStore\Types\EventMetadata;
+use Wwwision\DCBEventStore\Types\EventType;
 
 use function get_debug_type;
 use function json_decode;
@@ -26,29 +27,24 @@ use const JSON_THROW_ON_ERROR;
 /**
  * Simple converter that expects Domain Events to implement the {@see DomainEvent} interface
  */
-final readonly class EventNormalizer
+final readonly class EventSerializer implements \Wwwision\DCBLibrary\EventSerializer
 {
-    public function convertEvent(Event|EventEnvelope $event): DomainEvent
+    public function convertEvent(Event $event): DomainEvent
     {
-        if ($event instanceof EventEnvelope) {
-            $event = $event->event;
-        }
         try {
             $payload = json_decode($event->data->value, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
             throw new RuntimeException(sprintf('Failed to decode JSON: %s', $e->getMessage()), 1684510536, $e);
         }
         Assert::isArray($payload);
-        /** @var class-string<DomainEvent> $eventClassName
-         * @noinspection PhpRedundantVariableDocTypeInspection
-         */
+        /** @var class-string<DomainEvent> $eventClassName */
         $eventClassName = '\\Wwwision\\DCBExample\\Events\\' . $event->type->value;
         $domainEvent = $eventClassName::fromArray($payload);
         Assert::isInstanceOf($domainEvent, DomainEvent::class);
         return $domainEvent;
     }
 
-    public function convertDomainEvent(DomainEvent $domainEvent): Event
+    public function convertDomainEvent(BaseDomainEvent $domainEvent): Event
     {
         try {
             $eventData = json_encode($domainEvent, JSON_THROW_ON_ERROR);
@@ -60,6 +56,7 @@ final readonly class EventNormalizer
             EventType::fromString(substr($domainEvent::class, strrpos($domainEvent::class, '\\') + 1)),
             EventData::fromString($eventData),
             $domainEvent->tags(),
+            EventMetadata::none()
         );
     }
 }

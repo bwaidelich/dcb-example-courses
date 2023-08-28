@@ -12,11 +12,8 @@ use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SqlitePlatform;
 use InvalidArgumentException;
 use PHPUnit\Framework\Assert;
-use RuntimeException;
-use Throwable;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStore\EventStream;
-use Wwwision\DCBEventStore\Helpers\InMemoryEventStore;
 use Wwwision\DCBEventStore\Helpers\InMemoryEventStream;
 use Wwwision\DCBEventStore\Types\AppendCondition;
 use Wwwision\DCBEventStore\Types\Event;
@@ -24,7 +21,7 @@ use Wwwision\DCBEventStore\Types\Events;
 use Wwwision\DCBEventStore\Types\SequenceNumber;
 use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
 use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
-use Wwwision\DCBExample\CommandHandler;
+use Wwwision\DCBExample\App;
 use Wwwision\DCBExample\Commands\Command;
 use Wwwision\DCBExample\Commands\CreateCourse;
 use Wwwision\DCBExample\Commands\RegisterStudent;
@@ -34,24 +31,21 @@ use Wwwision\DCBExample\Commands\UnsubscribeStudentFromCourse;
 use Wwwision\DCBExample\Commands\UpdateCourseCapacity;
 use Wwwision\DCBExample\Events\CourseCreated;
 use Wwwision\DCBExample\Events\DomainEvent;
-use Wwwision\DCBExample\EventNormalizer;
 use Wwwision\DCBExample\Events\StudentRegistered;
 use Wwwision\DCBExample\Events\StudentSubscribedToCourse;
 use Wwwision\DCBExample\Events\StudentUnsubscribedFromCourse;
-use Wwwision\DCBExample\Exception\ConstraintException;
+use Wwwision\DCBExample\EventSerializer;
 use Wwwision\DCBExample\Types\CourseCapacity;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\CourseTitle;
 use Wwwision\DCBExample\Types\StudentId;
+use Wwwision\DCBLibrary\Exceptions\ConstraintException;
 use function array_diff;
 use function array_keys;
 use function array_map;
 use function explode;
-use function func_get_args;
-use function get_debug_type;
 use function implode;
 use function json_decode;
-use function reset;
 use function sprintf;
 use const JSON_THROW_ON_ERROR;
 
@@ -60,8 +54,8 @@ final class FeatureContext implements Context
     private Connection $eventStoreConnection;
     private EventStore $eventStore;
 
-    private CommandHandler $commandHandler;
-    private EventNormalizer $eventNormalizer;
+    private App $app;
+    private EventSerializer $eventNormalizer;
 
     private ?ConstraintException $lastConstraintException = null;
 
@@ -117,8 +111,8 @@ final class FeatureContext implements Context
                 $this->appendedEvents = $events;
             }
         };
-        $this->commandHandler = new CommandHandler($this->eventStore);
-        $this->eventNormalizer = new EventNormalizer();
+        $this->app = new App($this->eventStore);
+        $this->eventNormalizer = new EventSerializer();
     }
 
     /**
@@ -377,7 +371,7 @@ final class FeatureContext implements Context
         $this->eventStore->appendedEvents = Events::none();
         $this->eventStore->readEvents = Events::none();
         try {
-            $this->commandHandler->handle($command);
+            $this->app->handle($command);
         } catch (ConstraintException $exception) {
             $this->lastConstraintException = $exception;
         }

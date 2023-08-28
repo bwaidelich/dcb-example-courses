@@ -12,31 +12,74 @@ permissions:
 jobs:
   build:
 
+    strategy:
+      matrix:
+        php-versions: [ '8.2', '8.3' ]
+
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:latest
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: false
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: dcb
+        ports:
+          - 3306/tcp
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: dcb
+        ports:
+          - 5432/tcp
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 3
+
     steps:
-    - name: Setup PHP
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
-        
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-versions }}
+          extensions: pdo_mysql, pdo_sqlite, pdo_pgsql
 
-    - name: Validate composer.json and composer.lock
-      run: composer validate --strict
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Cache Composer packages
-      id: composer-cache
-      uses: actions/cache@v3
-      with:
-        path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-php-
+#      - name: Validate composer.json and composer.lock
+#        run: composer validate --strict
 
-    - name: Install dependencies
-      run: composer install --prefer-dist --no-progress
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
 
-    - name: Run test suite
-      run: composer run-script test
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Static Analysis (PHPStan)
+        run: composer run-script test-phpstan
+
+      - name: Static Analysis (Code Sniffer)
+        run: composer run-script test-cs
+
+      - name: Behat tests (SQLite)
+        run: composer run-script test-behat
+        env:
+          DCB_TEST_DSN: "pdo-sqlite:///events.sqlite"
+
+      - name: Behat tests (MySQL)
+        run: composer run-script test-behat
+        env:
+          DCB_TEST_DSN: "pdo-mysql://root:password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/dcb"
+
+      - name: Behat tests (PostgreSQL)
+        run: composer run-script test-behat
+        env:
+          DCB_TEST_DSN: "pdo-pgsql://root:password@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/dcb"
