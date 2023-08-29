@@ -40,6 +40,7 @@ Feature: Unsubscribing students from courses
       | Type                        | Tags                        |
       | "CourseCreated"             | ["course:c1"]               |
       | "StudentRegistered"         | ["student:s2"]              |
+      | "StudentSubscribedToCourse" | ["course:c1", "student:s1"] |
       | "StudentSubscribedToCourse" | ["course:c1", "student:s2"] |
     And the command should pass without errors
     And the following event should be appended:

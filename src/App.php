@@ -20,9 +20,10 @@ use Wwwision\DCBExample\Events\CourseRenamed;
 use Wwwision\DCBExample\Events\StudentRegistered;
 use Wwwision\DCBExample\Events\StudentSubscribedToCourse;
 use Wwwision\DCBExample\Events\StudentUnsubscribedFromCourse;
-use Wwwision\DCBExample\Types\CourseCapacity;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\CourseIds;
+use Wwwision\DCBExample\Types\CourseState;
+use Wwwision\DCBExample\Types\CourseStateValue;
 use Wwwision\DCBExample\Types\CourseTitle;
 use Wwwision\DCBExample\Types\StudentId;
 use Wwwision\DCBLibrary\Adapters\SynchronousCatchUpQueue;
@@ -61,8 +62,8 @@ final readonly class App
 
     private function handleCreateCourse(CreateCourse $command): void
     {
-        $this->eventPublisher->conditionalAppend(self::courseExists($command->courseId), function (bool $courseExists) use ($command) {
-            if ($courseExists) {
+        $this->eventPublisher->conditionalAppend(new CourseStateProjection($command->courseId), function (CourseState $state) use ($command) {
+            if ($state->value !== CourseStateValue::NON_EXISTING) {
                 throw new ConstraintException(sprintf('Failed to create course with id "%s" because a course with that id already exists', $command->courseId->value), 1684593925);
             }
             return new CourseCreated($command->courseId, $command->initialCapacity, $command->courseTitle);
@@ -72,10 +73,10 @@ final readonly class App
     private function handleRenameCourse(RenameCourse $command): void
     {
         $this->eventPublisher->conditionalAppend(CompositeProjection::create([
-            'courseExists' => self::courseExists($command->courseId),
+            'courseState' => new CourseStateProjection($command->courseId),
             'courseTitle' => self::courseTitle($command->courseId),
         ]), function ($state) use ($command) {
-            if (!$state->courseExists) {
+            if ($state->courseState->value === CourseStateValue::NON_EXISTING) {
                 throw new ConstraintException(sprintf('Failed to rename course with id "%s" because a course with that id does not exist', $command->courseId->value), 1684509782);
             }
             if ($state->courseTitle !== null && $state->courseTitle->equals($command->newCourseTitle)) {
@@ -99,19 +100,17 @@ final readonly class App
     {
         $this->eventPublisher->conditionalAppend(CompositeProjection::create([
             'studentRegistered' => self::studentRegistered($command->studentId),
-            'courseExists' => self::courseExists($command->courseId),
-            'courseCapacity' => self::courseCapacity($command->courseId),
-            'numberOfCourseSubscriptions' => self::numberOfCourseSubscriptions($command->courseId),
+            'courseState' => new CourseStateProjection($command->courseId),
             'studentSubscriptions' => self::studentSubscriptions($command->studentId),
         ]), function ($state) use ($command) {
             if (!$state->studentRegistered) {
                 throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a student with that id does not exist', $command->studentId->value, $command->courseId->value), 1686914105);
             }
-            if (!$state->courseExists) {
+            if ($state->courseState->value === CourseStateValue::NON_EXISTING) {
                 throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1685266122);
             }
-            if ($state->courseCapacity->value === $state->numberOfCourseSubscriptions) {
-                throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because the course\'s capacity of %d is reached', $command->studentId->value, $command->courseId->value, $state->courseCapacity->value), 1684603201);
+            if ($state->courseState->value === CourseStateValue::FULLY_BOOKED) {
+                throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because the course\'s capacity of %d is reached', $command->studentId->value, $command->courseId->value, $state->courseState->capacity->value), 1684603201);
             }
             if ($state->studentSubscriptions->contains($command->courseId)) {
                 throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because that student is already subscribed to this course', $command->studentId->value, $command->courseId->value), 1684510963);
@@ -127,11 +126,11 @@ final readonly class App
     private function handleUnsubscribeStudentFromCourse(UnsubscribeStudentFromCourse $command): void
     {
         $this->eventPublisher->conditionalAppend(CompositeProjection::create([
-            'courseExists' => self::courseExists($command->courseId),
+            'courseState' => new CourseStateProjection($command->courseId),
             'studentRegistered' => self::studentRegistered($command->studentId),
             'studentSubscriptions' => self::studentSubscriptions($command->studentId),
         ]), function ($state) use ($command) {
-            if (!$state->courseExists) {
+            if ($state->courseState->value === CourseStateValue::NON_EXISTING) {
                 throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1684579448);
             }
             if (!$state->studentRegistered) {
@@ -146,69 +145,21 @@ final readonly class App
 
     private function handleUpdateCourseCapacity(UpdateCourseCapacity $command): void
     {
-        $this->eventPublisher->conditionalAppend(CompositeProjection::create([
-            'courseExists' => self::courseExists($command->courseId),
-            'courseCapacity' => self::courseCapacity($command->courseId),
-            'numberOfCourseSubscriptions' => self::numberOfCourseSubscriptions($command->courseId),
-        ]), function ($state) use ($command) {
-            if (!$state->courseExists) {
+        $this->eventPublisher->conditionalAppend(new CourseStateProjection($command->courseId), function (CourseState $state) use ($command) {
+            if ($state->value === CourseStateValue::NON_EXISTING) {
                 throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because a course with that id does not exist', $command->courseId->value, $command->newCapacity->value), 1684604283);
             }
-            if ($state->courseCapacity->equals($command->newCapacity)) {
+            if ($command->newCapacity->equals($state->capacity)) {
                 throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because that is already the courses capacity', $command->courseId->value, $command->newCapacity->value), 1686819073);
             }
-            if ($state->numberOfCourseSubscriptions > $command->newCapacity->value) {
-                throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because it already has %d active subscriptions', $command->courseId->value, $command->newCapacity->value, $state->numberOfCourseSubscriptions), 1684604361);
+            if ($state->numberOfSubscriptions > $command->newCapacity->value) {
+                throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because it already has %d active subscriptions', $command->courseId->value, $command->newCapacity->value, $state->numberOfSubscriptions), 1684604361);
             }
             return new CourseCapacityChanged($command->courseId, $command->newCapacity);
         });
     }
 
     // -----------------------------
-
-    /**
-     * @return Projection<bool>
-     */
-    private static function courseExists(CourseId $courseId): Projection
-    {
-        return InMemoryProjection::create(
-            Tags::create($courseId->toTag()),
-            [
-                CourseCreated::class => static fn () => true,
-            ],
-            false
-        );
-    }
-
-    /**
-     * @return Projection<CourseCapacity>
-     */
-    private static function courseCapacity(CourseId $courseId): Projection
-    {
-        return InMemoryProjection::create(
-            Tags::create($courseId->toTag()),
-            [
-                CourseCreated::class => static fn($_, CourseCreated $event) => $event->initialCapacity,
-                CourseCapacityChanged::class => static fn($_, CourseCapacityChanged $event) => $event->newCapacity,
-            ],
-            CourseCapacity::fromInteger(0)
-        );
-    }
-
-    /**
-     * @return Projection<int>
-     */
-    private static function numberOfCourseSubscriptions(CourseId $courseId): Projection
-    {
-        return InMemoryProjection::create(
-            Tags::create($courseId->toTag()),
-            [
-                StudentSubscribedToCourse::class => static fn(int $state) => $state + 1,
-                StudentUnsubscribedFromCourse::class => static fn(int $state) => $state - 1,
-            ],
-            0
-        );
-    }
 
     /**
      * @return Projection<CourseTitle>
