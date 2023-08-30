@@ -9,8 +9,7 @@ use RuntimeException;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\Types\Event;
 use Wwwision\DCBEventStore\Types\EventData;
-use Wwwision\DCBExample\Events\DomainEvent;
-use Wwwision\DCBLibrary\DomainEvent as BaseDomainEvent;
+use Wwwision\DCBLibrary\DomainEvent;
 use Wwwision\DCBEventStore\Types\EventId;
 use Wwwision\DCBEventStore\Types\EventMetadata;
 use Wwwision\DCBEventStore\Types\EventType;
@@ -22,6 +21,7 @@ use function sprintf;
 use function strrpos;
 use function substr;
 
+use function Wwwision\Types\instantiate;
 use const JSON_THROW_ON_ERROR;
 
 /**
@@ -39,12 +39,12 @@ final readonly class EventSerializer implements \Wwwision\DCBLibrary\EventSerial
         Assert::isArray($payload);
         /** @var class-string<DomainEvent> $eventClassName */
         $eventClassName = '\\Wwwision\\DCBExample\\Events\\' . $event->type->value;
-        $domainEvent = $eventClassName::fromArray($payload);
+        $domainEvent = instantiate($eventClassName, $payload);
         Assert::isInstanceOf($domainEvent, DomainEvent::class);
         return $domainEvent;
     }
 
-    public function convertDomainEvent(BaseDomainEvent $domainEvent): Event
+    public function convertDomainEvent(DomainEvent $domainEvent): Event
     {
         try {
             $eventData = json_encode($domainEvent, JSON_THROW_ON_ERROR);

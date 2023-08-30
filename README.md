@@ -48,7 +48,7 @@ And you should get ...no output at all. That's because the example script curren
 Try changing the script to test, that the business rules are actually enforced, for example you could add the line:
 
 ```php
-$commandHandler->handle(new SubscribeStudentToCourse(CourseId::fromString('c1'), StudentId::fromString('s2')));
+$app->handle(new SubscribeStudentToCourse(CourseId::fromString('c1'), StudentId::fromString('s2')));
 ```
 
 to the end of the file, which should lead to the following exception:

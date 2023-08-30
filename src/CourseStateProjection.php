@@ -1,4 +1,4 @@
-<?php /** @noinspection ALL */
+<?php /** @noinspection PhpUnusedPrivateMethodInspection */
 
 declare(strict_types=1);
 
@@ -52,17 +52,17 @@ final class CourseStateProjection implements Projection, StreamQueryAware
         return $state;
     }
 
-    private function whenCourseCreated(CourseState $state, CourseCreated $event): CourseState
+    private function whenCourseCreated(CourseState $state, CourseCreated $domainEvent): CourseState
     {
-        return $state->withValue(CourseStateValue::CREATED)->withCapacity($event->initialCapacity);
+        return $state->withValue(CourseStateValue::CREATED)->withCapacity($domainEvent->initialCapacity);
     }
 
-    private function whenCourseCapacityChanged(CourseState $state, CourseCapacityChanged $event): CourseState
+    private function whenCourseCapacityChanged(CourseState $state, CourseCapacityChanged $domainEvent): CourseState
     {
-        return $state->withCapacity($event->newCapacity);
+        return $state->withCapacity($domainEvent->newCapacity);
     }
 
-    private function whenStudentSubscribedToCourse(CourseState $state, StudentSubscribedToCourse $event): CourseState
+    private function whenStudentSubscribedToCourse(CourseState $state, StudentSubscribedToCourse $domainEvent): CourseState
     {
         $state = $state->withNumberOfSubscriptions($state->numberOfSubscriptions + 1);
         if ($state->numberOfSubscriptions === $state->capacity->value) {
@@ -71,7 +71,7 @@ final class CourseStateProjection implements Projection, StreamQueryAware
         return $state;
     }
 
-    private function whenStudentUnsubscribedFromCourse(CourseState $state, StudentUnsubscribedFromCourse $event): CourseState
+    private function whenStudentUnsubscribedFromCourse(CourseState $state, StudentUnsubscribedFromCourse $domainEvent): CourseState
     {
         $state = $state->withNumberOfSubscriptions($state->numberOfSubscriptions + 1);
         if ($state->numberOfSubscriptions < $state->capacity->value && $state->value === CourseStateValue::FULLY_BOOKED) {

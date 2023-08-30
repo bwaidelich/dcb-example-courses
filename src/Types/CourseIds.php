@@ -9,14 +9,17 @@ use Countable;
 use IteratorAggregate;
 use Traversable;
 
+use Wwwision\Types\Attributes\Description;
+use Wwwision\Types\Attributes\ListBased;
 use function array_filter;
 use function array_map;
+use function Wwwision\Types\instantiate;
 
 /**
- * A type-safe set of {@see CourseId} instances
- *
  * @implements IteratorAggregate<CourseId>
  */
+#[Description('A type-safe set of {@see CourseId} instances')]
+#[ListBased(itemClassName: CourseId::class)]
 final class CourseIds implements IteratorAggregate, Countable
 {
     /**
@@ -25,22 +28,21 @@ final class CourseIds implements IteratorAggregate, Countable
     private function __construct(
         public readonly array $ids,
     ) {
-        //Assert::notEmpty($this->ids, 'CourseIds must not be empty');
     }
 
     public static function create(CourseId ...$ids): self
     {
-        return new self($ids);
+        return instantiate(self::class, $ids);
     }
 
     public static function none(): self
     {
-        return new self([]);
+        return instantiate(self::class, []);
     }
 
     public static function fromStrings(string ...$ids): self
     {
-        return new self(array_map(static fn (string $type) => CourseId::fromString($type), $ids));
+        return self::create(...array_map(static fn (string $type) => CourseId::fromString($type), $ids));
     }
 
     public function contains(CourseId $id): bool
@@ -58,7 +60,7 @@ final class CourseIds implements IteratorAggregate, Countable
         if ($this->contains($courseId)) {
             return $this;
         }
-        return new self([...$this->ids, $courseId]);
+        return self::create(...[...$this->ids, $courseId]);
     }
 
     public function without(CourseId $courseId): self
@@ -66,7 +68,7 @@ final class CourseIds implements IteratorAggregate, Countable
         if (!$this->contains($courseId)) {
             return $this;
         }
-        return new self(array_filter($this->ids, static fn (CourseId $id) => !$id->equals($courseId)));
+        return self::create(...array_filter($this->ids, static fn (CourseId $id) => !$id->equals($courseId)));
     }
 
     public function getIterator(): Traversable

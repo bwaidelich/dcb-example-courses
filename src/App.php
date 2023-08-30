@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Wwwision\DCBExample;
 
+use Doctrine\DBAL\Connection;
 use RuntimeException;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStore\Types\Tags;
+use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
+use Wwwision\DCBExample\Adapters\DbalCourseProjectionAdapter;
 use Wwwision\DCBExample\Commands\Command;
 use Wwwision\DCBExample\Commands\CreateCourse;
 use Wwwision\DCBExample\Commands\RegisterStudent;
@@ -20,6 +23,7 @@ use Wwwision\DCBExample\Events\CourseRenamed;
 use Wwwision\DCBExample\Events\StudentRegistered;
 use Wwwision\DCBExample\Events\StudentSubscribedToCourse;
 use Wwwision\DCBExample\Events\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\ReadModel\Course\CourseProjection;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\CourseIds;
 use Wwwision\DCBExample\Types\CourseState;
@@ -28,11 +32,13 @@ use Wwwision\DCBExample\Types\CourseTitle;
 use Wwwision\DCBExample\Types\StudentId;
 use Wwwision\DCBLibrary\Adapters\SynchronousCatchUpQueue;
 use Wwwision\DCBLibrary\EventHandling\EventHandlers;
+use Wwwision\DCBLibrary\EventHandling\ProjectionEventHandler;
 use Wwwision\DCBLibrary\EventPublisher;
 use Wwwision\DCBLibrary\Exceptions\ConstraintException;
 use Wwwision\DCBLibrary\Projection\CompositeProjection;
 use Wwwision\DCBLibrary\Projection\InMemoryProjection;
 use Wwwision\DCBLibrary\Projection\Projection;
+use Wwwision\DCBLibraryDoctrine\DbalCheckpointStorage;
 use function sprintf;
 
 /**
@@ -42,9 +48,31 @@ final readonly class App
 {
     private EventPublisher $eventPublisher;
 
-    public function __construct(EventStore $eventStore)
+    public function __construct(Connection $connection)
     {
-        $this->eventPublisher = new EventPublisher($eventStore, new EventSerializer(), new SynchronousCatchUpQueue($eventStore, EventHandlers::create()));
+
+        /** The second parameter is the table name to store the events in **/
+        $eventStore = DoctrineEventStore::create($connection, 'dcb_events');
+
+        /** The {@see EventStore::setup()} method is used to make sure that the Events Store backend is set up (i.e. required tables are created and their schema up-to-date) **/
+        $eventStore->setup();
+        $connection->executeStatement('TRUNCATE TABLE dcb_events');
+
+        $eventSerializer = new EventSerializer();
+
+        $courseProjection = new CourseProjection(new DbalCourseProjectionAdapter($connection));
+        $courseProjection->setup();
+        $courseProjection->reset();
+
+        $courseProjectionEventHandler = new ProjectionEventHandler($courseProjection, new DbalCheckpointStorage($connection, 'dcb_checkpoints', $courseProjection::class), $eventSerializer);
+        $courseProjectionEventHandler->setup();
+        $courseProjectionEventHandler->reset();
+
+        $eventHandlers = EventHandlers::create()
+            ->with('CourseProjection', $courseProjectionEventHandler);
+
+
+        $this->eventPublisher = new EventPublisher($eventStore, $eventSerializer, new SynchronousCatchUpQueue($eventStore, $eventHandlers));
     }
 
     public function handle(Command $command): void
