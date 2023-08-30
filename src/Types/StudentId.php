@@ -6,10 +6,12 @@ namespace Wwwision\DCBExample\Types;
 
 use JsonSerializable;
 use Wwwision\DCBEventStore\Types\Tag;
+use Wwwision\Types\Attributes\Description;
+use Wwwision\Types\Attributes\StringBased;
+use function Wwwision\Types\instantiate;
 
-/**
- * Globally unique identifier of a student (usually represented as a UUID v4)
- */
+#[Description('Globally unique identifier of a student (usually represented as a UUID v4)')]
+#[StringBased]
 final readonly class StudentId implements JsonSerializable
 {
     private function __construct(public string $value)
@@ -18,7 +20,7 @@ final readonly class StudentId implements JsonSerializable
 
     public static function fromString(string $value): self
     {
-        return new self($value);
+        return instantiate(self::class, $value);
     }
 
     public function jsonSerialize(): string

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Wwwision\DCBExample\Types;
 
+use JsonSerializable;
+
 final readonly class CourseState
 {
     private function __construct(
