@@ -28,6 +28,6 @@ final readonly class StudentId implements JsonSerializable
 
     public function toTag(): Tag
     {
-        return Tag::create('student', $this->value);
+        return Tag::fromString("student:$this->value");
     }
 }

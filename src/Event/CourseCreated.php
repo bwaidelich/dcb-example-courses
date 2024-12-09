@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Events;
+namespace Wwwision\DCBExample\Event;
 
 use Webmozart\Assert\Assert;
-use Wwwision\DCBEventStore\Types\Tags;
 use Wwwision\DCBExample\Types\CourseCapacity;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\CourseTitle;
@@ -13,7 +12,7 @@ use Wwwision\DCBExample\Types\CourseTitle;
 /**
  * Domain Events that occurs when a new course was created
  */
-final readonly class CourseCreated implements DomainEvent
+final readonly class CourseCreated implements CourseEvent
 {
     public function __construct(
         public CourseId $courseId,
@@ -38,10 +37,5 @@ final readonly class CourseCreated implements DomainEvent
             CourseCapacity::fromInteger((int)$data['initialCapacity']),
             CourseTitle::fromString($data['courseTitle']),
         );
-    }
-
-    public function tags(): Tags
-    {
-        return Tags::create($this->courseId->toTag());
     }
 }

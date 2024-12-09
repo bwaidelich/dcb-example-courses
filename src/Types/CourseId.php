@@ -33,6 +33,6 @@ final readonly class CourseId implements JsonSerializable
 
     public function toTag(): Tag
     {
-        return Tag::create('course', $this->value);
+        return Tag::fromString("course:$this->value");
     }
 }

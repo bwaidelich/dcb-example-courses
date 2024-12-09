@@ -6,39 +6,38 @@ namespace Wwwision\DCBExample;
 
 use Closure;
 use RuntimeException;
-use stdClass;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStore\Types\AppendCondition;
 use Wwwision\DCBEventStore\Types\Events;
 use Wwwision\DCBEventStore\Types\ExpectedHighestSequenceNumber;
-use Wwwision\DCBEventStore\Types\StreamQuery\Criteria;
-use Wwwision\DCBEventStore\Types\StreamQuery\Criteria\EventTypesAndTagsCriterion;
 use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
-use Wwwision\DCBEventStore\Types\Tags;
-use Wwwision\DCBExample\Commands\Command;
-use Wwwision\DCBExample\Commands\CreateCourse;
-use Wwwision\DCBExample\Commands\RegisterStudent;
-use Wwwision\DCBExample\Commands\RenameCourse;
-use Wwwision\DCBExample\Commands\SubscribeStudentToCourse;
-use Wwwision\DCBExample\Commands\UnsubscribeStudentFromCourse;
-use Wwwision\DCBExample\Commands\UpdateCourseCapacity;
-use Wwwision\DCBExample\Events\CourseCapacityChanged;
-use Wwwision\DCBExample\Events\CourseCreated;
-use Wwwision\DCBExample\Events\CourseRenamed;
-use Wwwision\DCBExample\Events\StudentRegistered;
-use Wwwision\DCBExample\Events\StudentSubscribedToCourse;
-use Wwwision\DCBExample\Events\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\Command\Command;
+use Wwwision\DCBExample\Command\CreateCourse;
+use Wwwision\DCBExample\Command\RegisterStudent;
+use Wwwision\DCBExample\Command\RenameCourse;
+use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
+use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
+use Wwwision\DCBExample\Command\UpdateCourseCapacity;
+use Wwwision\DCBExample\Event\CourseCapacityChanged;
+use Wwwision\DCBExample\Event\CourseCreated;
+use Wwwision\DCBExample\Event\CourseRenamed;
+use Wwwision\DCBExample\Event\DomainEvent;
+use Wwwision\DCBExample\Event\DomainEvents;
+use Wwwision\DCBExample\Event\StudentRegistered;
+use Wwwision\DCBExample\Event\StudentSubscribedToCourse;
+use Wwwision\DCBExample\Event\StudentUnsubscribedFromCourse;
 use Wwwision\DCBExample\Exception\ConstraintException;
-use Wwwision\DCBExample\Projections\GenericProjection;
-use Wwwision\DCBExample\Projections\Projection;
-use Wwwision\DCBExample\Projections\ProjectionLogic;
+use Wwwision\DCBExample\Projection\ClosureProjection;
+use Wwwision\DCBExample\Projection\CompositeProjection;
+use Wwwision\DCBExample\Projection\Projection;
+use Wwwision\DCBExample\Projection\StreamCriteriaAware;
+use Wwwision\DCBExample\Projection\TaggedProjection;
 use Wwwision\DCBExample\Types\CourseCapacity;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\CourseIds;
 use Wwwision\DCBExample\Types\CourseTitle;
 use Wwwision\DCBExample\Types\StudentId;
-use function array_map;
-use function is_array;
+
 use function sprintf;
 
 /**
@@ -46,12 +45,12 @@ use function sprintf;
  */
 final readonly class CommandHandler
 {
-    private EventNormalizer $eventNormalizer;
+    private EventSerializer $eventSerializer;
 
     public function __construct(
         private EventStore $eventStore,
     ) {
-        $this->eventNormalizer = new EventNormalizer();
+        $this->eventSerializer = new EventSerializer();
     }
 
     public function handle(Command $command): void
@@ -69,100 +68,117 @@ final readonly class CommandHandler
 
     private function handleCreateCourse(CreateCourse $command): void
     {
-        $this->transactional([
-            'courseExists' => self::courseExists($command->courseId),
-        ], function ($state) use ($command) {
-            if ($state->courseExists) {
-                throw new ConstraintException(sprintf('Failed to create course with id "%s" because a course with that id already exists', $command->courseId->value), 1684593925);
+        $this->conditionalAppend(
+            self::courseExists($command->courseId),
+            function (bool $courseExists) use ($command) {
+                if ($courseExists) {
+                    throw new ConstraintException(sprintf('Failed to create course with id "%s" because a course with that id already exists', $command->courseId->value), 1684593925);
+                }
+                return new CourseCreated($command->courseId, $command->initialCapacity, $command->courseTitle);
             }
-            return new CourseCreated($command->courseId, $command->initialCapacity, $command->courseTitle);
-        });
+        );
     }
 
     private function handleRenameCourse(RenameCourse $command): void
     {
-        $this->transactional([
-            'courseExists' => self::courseExists($command->courseId),
-            'courseTitle' => self::courseTitle($command->courseId),
-        ], function ($state) use ($command) {
-            if (!$state->courseExists) {
-                throw new ConstraintException(sprintf('Failed to rename course with id "%s" because a course with that id does not exist', $command->courseId->value), 1684509782);
+        $this->conditionalAppend(
+            CompositeProjection::create([
+                'courseExists' => self::courseExists($command->courseId),
+                'courseTitle' => self::courseTitle($command->courseId),
+            ]),
+            /** @param object{courseExists: bool, courseTitle: CourseTitle} $state */
+            function (object $state) use ($command) {
+                if (!$state->courseExists) {
+                    throw new ConstraintException(sprintf('Failed to rename course with id "%s" because a course with that id does not exist', $command->courseId->value), 1684509782);
+                }
+                if ($state->courseTitle->equals($command->newCourseTitle)) {
+                    throw new ConstraintException(sprintf('Failed to rename course with id "%s" to "%s" because this is already the title of this course', $command->courseId->value, $command->newCourseTitle->value), 1684509837);
+                }
+                return new CourseRenamed($command->courseId, $command->newCourseTitle);
             }
-            if ($state->courseTitle !== null && $state->courseTitle->equals($command->newCourseTitle)) {
-                throw new ConstraintException(sprintf('Failed to rename course with id "%s" to "%s" because this is already the title of this course', $command->courseId->value, $command->newCourseTitle->value), 1684509837);
-            }
-            return new CourseRenamed($command->courseId, $command->newCourseTitle);
-        });
+        );
     }
 
     private function handleRegisterStudent(RegisterStudent $command): void
     {
-        $this->transactional([
-            'studentRegistered' => self::studentRegistered($command->studentId),
-        ], function ($state) use ($command) {
-            if ($state->studentRegistered) {
-                throw new ConstraintException(sprintf('Failed to register student with id "%s" because a student with that id already exists', $command->studentId->value), 1684579300);
+        $this->conditionalAppend(
+            CompositeProjection::create([
+                'studentRegistered' => self::studentRegistered($command->studentId),
+            ]),
+            /** @param object{studentRegistered: bool} $state */
+            function (object $state) use ($command) {
+                if ($state->studentRegistered) {
+                    throw new ConstraintException(sprintf('Failed to register student with id "%s" because a student with that id already exists', $command->studentId->value), 1684579300);
+                }
+                return new StudentRegistered($command->studentId);
             }
-            return new StudentRegistered($command->studentId);
-        });
+        );
     }
 
     private function handleSubscribeStudentToCourse(SubscribeStudentToCourse $command): void
     {
-        $this->transactional([
-            'studentRegistered' => self::studentRegistered($command->studentId),
-            'courseExists' => self::courseExists($command->courseId),
-            'courseCapacity' => self::courseCapacity($command->courseId),
-            'numberOfCourseSubscriptions' => self::numberOfCourseSubscriptions($command->courseId),
-            'studentSubscriptions' => self::studentSubscriptions($command->studentId),
-        ], function ($state) use ($command) {
-            if (!$state->studentRegistered) {
-                throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a student with that id does not exist', $command->studentId->value, $command->courseId->value), 1686914105);
+        $this->conditionalAppend(
+            CompositeProjection::create([
+                'studentRegistered' => self::studentRegistered($command->studentId),
+                'courseExists' => self::courseExists($command->courseId),
+                'courseCapacity' => self::courseCapacity($command->courseId),
+                'numberOfCourseSubscriptions' => self::numberOfCourseSubscriptions($command->courseId),
+                'studentSubscriptions' => self::studentSubscriptions($command->studentId),
+            ]),
+            /** @param object{studentRegistered: bool, courseExists: bool, courseCapacity: CourseCapacity, numberOfCourseSubscriptions: int, studentSubscriptions: CourseIds} $state */
+            function (object $state) use ($command) {
+                if (!$state->studentRegistered) {
+                    throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a student with that id does not exist', $command->studentId->value, $command->courseId->value), 1686914105);
+                }
+                if (!$state->courseExists) {
+                    throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1685266122);
+                }
+                if ($state->courseCapacity->value === $state->numberOfCourseSubscriptions) {
+                    throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because the course\'s capacity of %d is reached', $command->studentId->value, $command->courseId->value, $state->courseCapacity->value), 1684603201);
+                }
+                if ($state->studentSubscriptions->contains($command->courseId)) {
+                    throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because that student is already subscribed to this course', $command->studentId->value, $command->courseId->value), 1684510963);
+                }
+                $maximumSubscriptionsPerStudent = 10;
+                if ($state->studentSubscriptions->count() === $maximumSubscriptionsPerStudent) {
+                    throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because that student is already subscribed the maximum of %d courses', $command->studentId->value, $command->courseId->value, $maximumSubscriptionsPerStudent), 1684605232);
+                }
+                return new StudentSubscribedToCourse($command->courseId, $command->studentId);
             }
-            if (!$state->courseExists) {
-                throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1685266122);
-            }
-            if ($state->courseCapacity->value === $state->numberOfCourseSubscriptions) {
-                throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because the course\'s capacity of %d is reached', $command->studentId->value, $command->courseId->value, $state->courseCapacity->value), 1684603201);
-            }
-            if ($state->studentSubscriptions->contains($command->courseId)) {
-                throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because that student is already subscribed to this course', $command->studentId->value, $command->courseId->value), 1684510963);
-            }
-            $maximumSubscriptionsPerStudent = 10;
-            if ($state->studentSubscriptions->count() === $maximumSubscriptionsPerStudent) {
-                throw new ConstraintException(sprintf('Failed to subscribe student with id "%s" to course with id "%s" because that student is already subscribed the maximum of %d courses', $command->studentId->value, $command->courseId->value, $maximumSubscriptionsPerStudent), 1684605232);
-            }
-            return new StudentSubscribedToCourse($command->courseId, $command->studentId);
-        });
+        );
     }
 
     private function handleUnsubscribeStudentFromCourse(UnsubscribeStudentFromCourse $command): void
     {
-        $this->transactional([
-            'courseExists' => self::courseExists($command->courseId),
-            'studentRegistered' => self::studentRegistered($command->studentId),
-            'studentSubscriptions' => self::studentSubscriptions($command->studentId),
-        ], function ($state) use ($command) {
-            if (!$state->courseExists) {
-                throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1684579448);
+        $this->conditionalAppend(
+            CompositeProjection::create([
+                'courseExists' => self::courseExists($command->courseId),
+                'studentRegistered' => self::studentRegistered($command->studentId),
+                'studentSubscriptions' => self::studentSubscriptions($command->studentId),
+            ]),
+            /** @param object{courseExists: bool, studentRegistered: bool, studentSubscriptions: CourseIds} $state */
+            function (object $state) use ($command) {
+                if (!$state->courseExists) {
+                    throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because a course with that id does not exist', $command->studentId->value, $command->courseId->value), 1684579448);
+                }
+                if (!$state->studentRegistered) {
+                    throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because a student with that id does not exist', $command->studentId->value, $command->courseId->value), 1684579463);
+                }
+                if (!$state->studentSubscriptions->contains($command->courseId)) {
+                    throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because that student is not subscribed to this course', $command->studentId->value, $command->courseId->value), 1684579464);
+                }
+                return new StudentUnsubscribedFromCourse($command->studentId, $command->courseId);
             }
-            if (!$state->studentRegistered) {
-                throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because a student with that id does not exist', $command->studentId->value, $command->courseId->value), 1684579463);
-            }
-            if (!$state->studentSubscriptions->contains($command->courseId)) {
-                throw new ConstraintException(sprintf('Failed to unsubscribe student with id "%s" from course with id "%s" because that student is not subscribed to this course', $command->studentId->value, $command->courseId->value), 1684579464);
-            }
-            return new StudentUnsubscribedFromCourse($command->studentId, $command->courseId);
-        });
+        );
     }
 
     private function handleUpdateCourseCapacity(UpdateCourseCapacity $command): void
     {
-        $this->transactional([
+        $this->conditionalAppend(CompositeProjection::create([
             'courseExists' => self::courseExists($command->courseId),
             'courseCapacity' => self::courseCapacity($command->courseId),
             'numberOfCourseSubscriptions' => self::numberOfCourseSubscriptions($command->courseId),
-        ], function ($state) use ($command) {
+        ]), function ($state) use ($command) {
             if (!$state->courseExists) {
                 throw new ConstraintException(sprintf('Failed to change capacity of course with id "%s" to %d because a course with that id does not exist', $command->courseId->value, $command->newCapacity->value), 1684604283);
             }
@@ -183,10 +199,13 @@ final readonly class CommandHandler
      */
     private static function courseExists(CourseId $courseId): Projection
     {
-        return new GenericProjection(
-            Tags::create($courseId->toTag()),
-            (new ProjectionLogic(false))
-                ->when(CourseCreated::class, static fn() => true)
+        return TaggedProjection::create(
+            $courseId->toTag(),
+            ClosureProjection::create(
+                initialState: false,
+                onlyLastEvent: true,
+            )
+              ->when(CourseCreated::class, fn() => true)
         );
     }
 
@@ -196,11 +215,13 @@ final readonly class CommandHandler
      */
     private static function courseCapacity(CourseId $courseId): Projection
     {
-        return new GenericProjection(
-            Tags::create($courseId->toTag()),
-            (new ProjectionLogic(CourseCapacity::fromInteger(0)))
-                ->when(CourseCreated::class, static fn($_, CourseCreated $event) => $event->initialCapacity)
-                ->when(CourseCapacityChanged::class, static fn($_, CourseCapacityChanged $event) => $event->newCapacity)
+        return TaggedProjection::create(
+            $courseId->toTag(),
+            ClosureProjection::create(
+                initialState: CourseCapacity::fromInteger(0),
+            )
+                ->when(CourseCreated::class, fn($_, CourseCreated $event) => $event->initialCapacity)
+                ->when(CourseCapacityChanged::class, fn($_, CourseCapacityChanged $event) => $event->newCapacity)
         );
     }
 
@@ -210,11 +231,13 @@ final readonly class CommandHandler
      */
     private static function numberOfCourseSubscriptions(CourseId $courseId): Projection
     {
-        return new GenericProjection(
-            Tags::create($courseId->toTag()),
-            (new ProjectionLogic(0))
-                ->when(StudentSubscribedToCourse::class, static fn(int $state) => $state + 1)
-                ->when(StudentUnsubscribedFromCourse::class, static fn(int $state) => $state - 1)
+        return TaggedProjection::create(
+            $courseId->toTag(),
+            ClosureProjection::create(
+                initialState: 0,
+            )
+                ->when(StudentSubscribedToCourse::class, fn(int $state) => $state + 1)
+                ->when(StudentUnsubscribedFromCourse::class, fn(int $state) => $state - 1)
         );
     }
 
@@ -224,19 +247,25 @@ final readonly class CommandHandler
      */
     private static function courseTitle(CourseId $courseId): Projection
     {
-        /** @var ProjectionLogic<CourseTitle> $logic */
-        $logic = (new ProjectionLogic(CourseTitle::fromString('')))
+        return TaggedProjection::create(
+            $courseId->toTag(),
+            ClosureProjection::create(
+                initialState: CourseTitle::fromString(''),
+            )
             ->when(CourseCreated::class, static fn ($_, CourseCreated $event) => $event->courseTitle)
-            ->when(CourseRenamed::class, static fn ($_, CourseRenamed $event) => $event->newCourseTitle);
-        return new GenericProjection(Tags::create($courseId->toTag()), $logic);
+            ->when(CourseRenamed::class, static fn ($_, CourseRenamed $event) => $event->newCourseTitle)
+        );
     }
 
     private static function studentRegistered(StudentId $studentId): Projection
     {
-        return new GenericProjection(
-            Tags::create($studentId->toTag()),
-            (new ProjectionLogic(false))
-                ->when(StudentRegistered::class, static fn() => true)
+        return TaggedProjection::create(
+            $studentId->toTag(),
+            ClosureProjection::create(
+                initialState: false,
+                onlyLastEvent: true,
+            )
+                ->when(StudentRegistered::class, fn() => true)
         );
     }
 
@@ -246,45 +275,40 @@ final readonly class CommandHandler
      */
     private static function studentSubscriptions(StudentId $studentId): Projection
     {
-        /** @var ProjectionLogic<bool> $logic */
-        $logic = (new ProjectionLogic(CourseIds::none()))
-            ->when(StudentSubscribedToCourse::class, static fn (CourseIds $state, StudentSubscribedToCourse $event) => $state->with($event->courseId))
-            ->when(StudentUnsubscribedFromCourse::class, static fn (CourseIds $state, StudentUnsubscribedFromCourse $event) => $state->without($event->courseId));
-
-        return new GenericProjection(Tags::create($studentId->toTag()), $logic);
+        return TaggedProjection::create(
+            $studentId->toTag(),
+            ClosureProjection::create(
+                initialState: CourseIds::none(),
+            )
+                ->when(StudentSubscribedToCourse::class, static fn (CourseIds $state, StudentSubscribedToCourse $event) => $state->with($event->courseId))
+                ->when(StudentUnsubscribedFromCourse::class, static fn (CourseIds $state, StudentUnsubscribedFromCourse $event) => $state->without($event->courseId))
+        );
     }
 
     /**
-     * @param array<string, Projection> $projections
+     * @template S
+     * @param Projection<S> $projection
+     * @param Closure(S): (DomainEvent|DomainEvents) $eventProducer
+     * @return void
      */
-    private function transactional(array $projections, Closure $closure): void
+    public function conditionalAppend(Projection $projection, Closure $eventProducer): void
     {
-        $criteria = [];
-        foreach ($projections as $projection) {
-            $criteria[] = new EventTypesAndTagsCriterion($projection->eventTypes(), $projection->tags());
+        $query = StreamQuery::wildcard();
+        if ($projection instanceof StreamCriteriaAware) {
+            $query = $query->withCriteria($projection->getCriteria());
         }
-        $query = StreamQuery::create(Criteria::fromArray($criteria));
         $expectedHighestSequenceNumber = ExpectedHighestSequenceNumber::none();
+        $state = $projection->initialState();
         foreach ($this->eventStore->read($query) as $eventEnvelope) {
-            $domainEvent = $this->eventNormalizer->convertEvent($eventEnvelope);
-            foreach ($projections as $projection) {
-                if (!$projection->eventTypes()->contain($eventEnvelope->event->type)) {
-                    continue;
-                }
-                if (!$domainEvent->tags()->containEvery($projection->tags())) {
-                    continue;
-                }
-                $projection->apply($domainEvent);
-            }
+            $domainEvent = $this->eventSerializer->convertEvent($eventEnvelope->event);
+            $state = $projection->apply($state, $domainEvent, $eventEnvelope);
             $expectedHighestSequenceNumber = ExpectedHighestSequenceNumber::fromSequenceNumber($eventEnvelope->sequenceNumber);
         }
-        $state = new stdClass();
-        foreach ($projections as $key => $projection) {
-            $state->$key = $projection->getState();
+        $domainEvents = $eventProducer($state);
+        if ($domainEvents instanceof DomainEvent) {
+            $domainEvents = DomainEvents::create($domainEvents);
         }
-        $domainEvents = $closure($state);
-        $events = Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), is_array($domainEvents) ? $domainEvents : [$domainEvents]));
+        $events = Events::fromArray($domainEvents->map($this->eventSerializer->convertDomainEvent(...)));
         $this->eventStore->append($events, new AppendCondition($query, $expectedHighestSequenceNumber));
-
     }
 }

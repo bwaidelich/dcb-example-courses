@@ -2,17 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Events;
+namespace Wwwision\DCBExample\Event;
 
 use Webmozart\Assert\Assert;
-use Wwwision\DCBEventStore\Types\Tags;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\CourseTitle;
 
 /**
  * Domain Events that occurs when the title of a course has changed
  */
-final readonly class CourseRenamed implements DomainEvent
+final readonly class CourseRenamed implements CourseEvent
 {
     public function __construct(
         public CourseId $courseId,
@@ -33,10 +32,5 @@ final readonly class CourseRenamed implements DomainEvent
             CourseId::fromString($data['courseId']),
             CourseTitle::fromString($data['newCourseTitle']),
         );
-    }
-
-    public function tags(): Tags
-    {
-        return Tags::create($this->courseId->toTag());
     }
 }

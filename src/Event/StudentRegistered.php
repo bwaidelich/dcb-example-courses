@@ -2,16 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Events;
+namespace Wwwision\DCBExample\Event;
 
 use Webmozart\Assert\Assert;
-use Wwwision\DCBEventStore\Types\Tags;
 use Wwwision\DCBExample\Types\StudentId;
 
 /**
  * Domain Events that occurs when a new student was registered in the system
  */
-final readonly class StudentRegistered implements DomainEvent
+final readonly class StudentRegistered implements StudentEvent
 {
     public function __construct(
         public StudentId $studentId,
@@ -28,10 +27,5 @@ final readonly class StudentRegistered implements DomainEvent
         return new self(
             StudentId::fromString($data['studentId']),
         );
-    }
-
-    public function tags(): Tags
-    {
-        return Tags::create($this->studentId->toTag());
     }
 }

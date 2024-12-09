@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Events;
+namespace Wwwision\DCBExample\Event;
 
 use Webmozart\Assert\Assert;
-use Wwwision\DCBEventStore\Types\Tags;
 use Wwwision\DCBExample\Types\CourseId;
 use Wwwision\DCBExample\Types\StudentId;
 
@@ -14,7 +13,7 @@ use Wwwision\DCBExample\Types\StudentId;
  *
  * Note: This event affects two entities (course and student)!
  */
-final readonly class StudentUnsubscribedFromCourse implements DomainEvent
+final readonly class StudentUnsubscribedFromCourse implements CourseEvent, StudentEvent
 {
     public function __construct(
         public StudentId $studentId,
@@ -32,10 +31,5 @@ final readonly class StudentUnsubscribedFromCourse implements DomainEvent
         Assert::keyExists($data, 'studentId');
         Assert::string($data['studentId']);
         return new self(StudentId::fromString($data['studentId']), CourseId::fromString($data['courseId']),);
-    }
-
-    public function tags(): Tags
-    {
-        return Tags::create($this->courseId->toTag(), $this->studentId->toTag());
     }
 }

@@ -28,3 +28,18 @@ Feature: Renaming courses
     And the following event should be appended:
       | Type            | Data                                                      | Tags          |
       | "CourseRenamed" | {"courseId": "c1", "newCourseTitle": "course 01 renamed"} | ["course:c1"] |
+
+  Scenario: Renaming course
+    Given course "c1" exists with the title "course 01"
+    When course "c1" is renamed to "course 01 renamed 1"
+    When course "c1" is renamed to "course 01 renamed 2"
+    When course "c1" is renamed to "course 01 renamed 3"
+    Then the following events should be read:
+      | Type            | Tags          |
+      | "CourseCreated" | ["course:c1"] |
+      | "CourseRenamed" | ["course:c1"] |
+      | "CourseRenamed" | ["course:c1"] |
+    And the command should pass without errors
+    And the following event should be appended:
+      | Type            | Data                                                        | Tags          |
+      | "CourseRenamed" | {"courseId": "c1", "newCourseTitle": "course 01 renamed 3"} | ["course:c1"] |

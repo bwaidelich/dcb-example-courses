@@ -2,17 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Events;
+namespace Wwwision\DCBExample\Event;
 
 use Webmozart\Assert\Assert;
-use Wwwision\DCBEventStore\Types\Tags;
 use Wwwision\DCBExample\Types\CourseCapacity;
 use Wwwision\DCBExample\Types\CourseId;
 
 /**
  * Domain Events that occurs when the total capacity of a course has changed
  */
-final readonly class CourseCapacityChanged implements DomainEvent
+final readonly class CourseCapacityChanged implements CourseEvent
 {
     public function __construct(
         public CourseId $courseId,
@@ -33,10 +32,5 @@ final readonly class CourseCapacityChanged implements DomainEvent
             CourseId::fromString($data['courseId']),
             CourseCapacity::fromInteger((int)$data['newCapacity']),
         );
-    }
-
-    public function tags(): Tags
-    {
-        return Tags::create($this->courseId->toTag());
     }
 }

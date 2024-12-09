@@ -5,22 +5,24 @@ use Doctrine\DBAL\DriverManager;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
 use Wwwision\DCBExample\CommandHandler;
-use Wwwision\DCBExample\Commands\Command;
-use Wwwision\DCBExample\Commands\CreateCourse;
-use Wwwision\DCBExample\Commands\RegisterStudent;
-use Wwwision\DCBExample\Commands\RenameCourse;
-use Wwwision\DCBExample\Commands\SubscribeStudentToCourse;
-use Wwwision\DCBExample\Commands\UnsubscribeStudentFromCourse;
-use Wwwision\DCBExample\Commands\UpdateCourseCapacity;
-use Wwwision\DCBExample\Types\CourseCapacity;
-use Wwwision\DCBExample\Types\CourseId;
-use Wwwision\DCBExample\Types\CourseTitle;
-use Wwwision\DCBExample\Types\StudentId;
+use Wwwision\DCBExample\Command\Command;
+use Wwwision\DCBExample\Command\CreateCourse;
+use Wwwision\DCBExample\Command\RegisterStudent;
+use Wwwision\DCBExample\Command\RenameCourse;
+use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
+use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
+use Wwwision\DCBExample\Command\UpdateCourseCapacity;
 
 require __DIR__ . '/vendor/autoload.php';
 
-/** We use an in-memory SQLite database for the events (@see https://www.doctrine-project.org/projects/doctrine-dbal/en/2.4/reference/configuration.html for how to configure other database backends) **/
-$connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:']);
+/** We use an in-memory SQLite database for the events **/
+$dsn = 'sqlite:///:memory:';
+
+/** @see https://www.doctrine-project.org/projects/doctrine-dbal/en/2.4/reference/configuration.html for how to configure other database backends, some examples: */
+#$dsn = 'sqlite:///events.sqlite';
+#$dsn = 'mysql://user:password@127.0.0.1:3306/test';
+#$dsn = 'pgsql://user:password@127.0.0.1:5432/db';
+$connection = DriverManager::getConnection(['url' => $dsn]);
 
 /** The second parameter is the table name to store the events in **/
 $eventStore = DoctrineEventStore::create($connection, 'dcb_events');
@@ -33,19 +35,19 @@ $commandHandler = new CommandHandler($eventStore);
 
 // Example:
 // 1. Create a course (c1)
-$commandHandler->handle(new CreateCourse(CourseId::fromString('c1'), CourseCapacity::fromInteger(10), CourseTitle::fromString('Course 02')));
+$commandHandler->handle(CreateCourse::create(courseId: 'c1', initialCapacity: 10, courseTitle: 'Course 02'));
 
 // 2. rename it, register a student (s1) and subscribe it to the course, change the course capacity, unregister the student
-$commandHandler->handle(new RenameCourse(CourseId::fromString('c1'), CourseTitle::fromString('Course 01 renamed again')));
+$commandHandler->handle(RenameCourse::create(courseId: 'c1', newCourseTitle: 'Course 01 renamed'));
 
 // 3. register a student (s1) in the system
-$commandHandler->handle(new RegisterStudent(StudentId::fromString('s1')));
+$commandHandler->handle(RegisterStudent::create(studentId: 's1'));
 
 // 4. subscribe student (s1) to course (s1)
-$commandHandler->handle(new SubscribeStudentToCourse(CourseId::fromString('c1'), StudentId::fromString('s1')));
+$commandHandler->handle(SubscribeStudentToCourse::create(courseId: 'c1', studentId: 's1'));
 
 // 5. change capacity of course (c1) to 5
-$commandHandler->handle(new UpdateCourseCapacity(CourseId::fromString('c1'), CourseCapacity::fromInteger(5)));
+$commandHandler->handle(UpdateCourseCapacity::create(courseId: 'c1', newCapacity: 5));
 
 // 6. unsubscribe student (s1) from course (c1)
-$commandHandler->handle(new UnsubscribeStudentFromCourse(CourseId::fromString('c1'), StudentId::fromString('s1')));
+$commandHandler->handle(UnsubscribeStudentFromCourse::create(courseId: 'c1', studentId: 's1'));

@@ -21,23 +21,24 @@ use Wwwision\DCBEventStore\Helpers\InMemoryEventStream;
 use Wwwision\DCBEventStore\Types\AppendCondition;
 use Wwwision\DCBEventStore\Types\Event;
 use Wwwision\DCBEventStore\Types\Events;
+use Wwwision\DCBEventStore\Types\ReadOptions;
 use Wwwision\DCBEventStore\Types\SequenceNumber;
 use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
 use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
 use Wwwision\DCBExample\CommandHandler;
-use Wwwision\DCBExample\Commands\Command;
-use Wwwision\DCBExample\Commands\CreateCourse;
-use Wwwision\DCBExample\Commands\RegisterStudent;
-use Wwwision\DCBExample\Commands\RenameCourse;
-use Wwwision\DCBExample\Commands\SubscribeStudentToCourse;
-use Wwwision\DCBExample\Commands\UnsubscribeStudentFromCourse;
-use Wwwision\DCBExample\Commands\UpdateCourseCapacity;
-use Wwwision\DCBExample\Events\CourseCreated;
-use Wwwision\DCBExample\Events\DomainEvent;
-use Wwwision\DCBExample\EventNormalizer;
-use Wwwision\DCBExample\Events\StudentRegistered;
-use Wwwision\DCBExample\Events\StudentSubscribedToCourse;
-use Wwwision\DCBExample\Events\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\Command\Command;
+use Wwwision\DCBExample\Command\CreateCourse;
+use Wwwision\DCBExample\Command\RegisterStudent;
+use Wwwision\DCBExample\Command\RenameCourse;
+use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
+use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
+use Wwwision\DCBExample\Command\UpdateCourseCapacity;
+use Wwwision\DCBExample\Event\CourseCreated;
+use Wwwision\DCBExample\Event\DomainEvent;
+use Wwwision\DCBExample\EventSerializer;
+use Wwwision\DCBExample\Event\StudentRegistered;
+use Wwwision\DCBExample\Event\StudentSubscribedToCourse;
+use Wwwision\DCBExample\Event\StudentUnsubscribedFromCourse;
 use Wwwision\DCBExample\Exception\ConstraintException;
 use Wwwision\DCBExample\Types\CourseCapacity;
 use Wwwision\DCBExample\Types\CourseId;
@@ -61,11 +62,11 @@ final class FeatureContext implements Context
     private EventStore $eventStore;
 
     private CommandHandler $commandHandler;
-    private EventNormalizer $eventNormalizer;
+    private EventSerializer $eventSerializer;
 
     private ?ConstraintException $lastConstraintException = null;
 
-    public function __construct(string $eventStoreDsn = null, private string $eventTableName = 'dcb_events_test')
+    public function __construct(string|null $eventStoreDsn = null, private string $eventTableName = 'dcb_events_test')
     {
         $this->eventStoreConnection = DriverManager::getConnection(['url' => $eventStoreDsn ?? 'pdo-sqlite://:memory:']);
 
@@ -88,21 +89,9 @@ final class FeatureContext implements Context
                 $this->inner->setup();
             }
 
-            public function read(StreamQuery $query, ?SequenceNumber $from = null): EventStream
+            public function read(StreamQuery $query, ReadOptions|null $options = null): EventStream
             {
-                $innerStream = $this->inner->read($query, $from);
-                $eventEnvelopes = [];
-                foreach ($innerStream as $eventEnvelope) {
-                    $this->readEvents = $this->readEvents->append($eventEnvelope->event);
-                    $eventEnvelopes[] = $eventEnvelope;
-                }
-                return InMemoryEventStream::create(...$eventEnvelopes);
-
-            }
-
-            public function readBackwards(StreamQuery $query, ?SequenceNumber $from = null): EventStream
-            {
-                $innerStream = $this->inner->readBackwards($query, $from);
+                $innerStream = $this->inner->read($query, $options);
                 $eventEnvelopes = [];
                 foreach ($innerStream as $eventEnvelope) {
                     $this->readEvents = $this->readEvents->append($eventEnvelope->event);
@@ -111,14 +100,17 @@ final class FeatureContext implements Context
                 return InMemoryEventStream::create(...$eventEnvelopes);
             }
 
-            public function append(Events $events, AppendCondition $condition): void
+            public function append(Events|Event $events, AppendCondition $condition): void
             {
                 $this->inner->append($events, $condition);
+                if ($events instanceof Event) {
+                    $events = Events::fromArray([$events]);
+                }
                 $this->appendedEvents = $events;
             }
         };
         $this->commandHandler = new CommandHandler($this->eventStore);
-        $this->eventNormalizer = new EventNormalizer();
+        $this->eventSerializer = new EventSerializer();
     }
 
     /**
@@ -132,7 +124,7 @@ final class FeatureContext implements Context
     }
 
     /**
-     * @AfterScenario
+     * AfterScenario
      */
     public function resetEventStore(): void
     {
@@ -155,14 +147,14 @@ final class FeatureContext implements Context
      * @Given course :courseIds exists with the title :courseTitle
      * @Given course(s) :courseIds exist(s)
      */
-    public function courseExists(string $courseIds, string $courseTitle = null, int $initialCapacity = null): void
+    public function courseExists(string $courseIds, string|null $courseTitle = null, int|null $initialCapacity = null): void
     {
         $domainEvents = [];
         foreach (explode(',', $courseIds) as $courseId) {
             $domainEvents[] = new CourseCreated(
                 CourseId::fromString($courseId),
                 CourseCapacity::fromInteger($initialCapacity ?? 10),
-                courseTitle::fromString($courseTitle ?? 'course ' . $courseId),
+                courseTitle::fromString($courseTitle ?? ('course ' . $courseId)),
             );
         }
         $this->appendEvents(...$domainEvents);
@@ -219,12 +211,12 @@ final class FeatureContext implements Context
      * @When a new course is created with id :courseId and title :courseTitle
      * @When a new course is created with id :courseId
      */
-    public function aNewCourseIsCreated(string $courseId, string $courseTitle = null, int $initialCapacity = null): void
+    public function aNewCourseIsCreated(string $courseId, string|null $courseTitle = null, int|null $initialCapacity = null): void
     {
-        $command = new CreateCourse(
-            CourseId::fromString($courseId),
-            CourseCapacity::fromInteger($initialCapacity ?? 10),
-            courseTitle::fromString($courseTitle ?? 'course ' . $courseId),
+        $command = CreateCourse::create(
+            courseId: $courseId,
+            initialCapacity: $initialCapacity ?? 10,
+            courseTitle: $courseTitle ?? ('course ' . $courseId),
         );
         $this->handleCommandAndCatchException($command);
     }
@@ -234,9 +226,9 @@ final class FeatureContext implements Context
      */
     public function courseIsRenamed(string $courseId, string $newCourseTitle): void
     {
-        $command = new RenameCourse(
-            CourseId::fromString($courseId),
-            CourseTitle::fromString($newCourseTitle),
+        $command = RenameCourse::create(
+            courseId: $courseId,
+            newCourseTitle: $newCourseTitle,
         );
         $this->handleCommandAndCatchException($command);
     }
@@ -246,9 +238,9 @@ final class FeatureContext implements Context
      */
     public function courseCapacityIsChanged(string $courseId, int $newCapacity): void
     {
-        $command = new UpdateCourseCapacity(
-            CourseId::fromString($courseId),
-            CourseCapacity::fromInteger($newCapacity),
+        $command = UpdateCourseCapacity::create(
+            courseId: $courseId,
+            newCapacity: $newCapacity,
         );
         $this->handleCommandAndCatchException($command);
     }
@@ -258,7 +250,7 @@ final class FeatureContext implements Context
      */
     public function aNewCourseIsRegistered(string $studentId): void
     {
-        $command = new RegisterStudent(
+        $command = RegisterStudent::create(
             StudentId::fromString($studentId),
         );
         $this->handleCommandAndCatchException($command);
@@ -269,7 +261,7 @@ final class FeatureContext implements Context
      */
     public function studentSubscribesToCourse(string $studentId, string $courseId): void
     {
-        $command = new SubscribeStudentToCourse(
+        $command = SubscribeStudentToCourse::create(
             CourseId::fromString($courseId),
             StudentId::fromString($studentId),
         );
@@ -281,7 +273,7 @@ final class FeatureContext implements Context
      */
     public function studentUnsubscribesFromCourse(string $studentId, string $courseId): void
     {
-        $command = new UnsubscribeStudentFromCourse(
+        $command = UnsubscribeStudentFromCourse::create(
             CourseId::fromString($courseId),
             StudentId::fromString($studentId),
         );
@@ -353,16 +345,15 @@ final class FeatureContext implements Context
 
     private static function eventToArray(array $keys, Event $event): array
     {
-        $supportedKeys = ['Id', 'Type', 'Data', 'Tags'];
+        $supportedKeys = ['Type', 'Data', 'Tags'];
         $unsupportedKeys = array_diff($keys, $supportedKeys);
         if ($unsupportedKeys !== []) {
             throw new InvalidArgumentException(sprintf('Invalid key(s) "%s" for expected event. Allowed keys are: "%s"', implode('", "', $unsupportedKeys), implode('", "', $supportedKeys)), 1686128517);
         }
         $actualAsArray = [
-            'Id' => $event->id->value,
             'Type' => $event->type->value,
             'Data' => json_decode($event->data->value, true, 512, JSON_THROW_ON_ERROR),
-            'Tags' => $event->tags->toSimpleArray(),
+            'Tags' => $event->tags->toStrings(),
         ];
         foreach (array_diff($supportedKeys, $keys) as $unusedKey) {
             unset($actualAsArray[$unusedKey]);
@@ -385,7 +376,7 @@ final class FeatureContext implements Context
 
     private function appendEvents(DomainEvent ...$domainEvents): void
     {
-        $this->eventStore->append(Events::fromArray(array_map($this->eventNormalizer->convertDomainEvent(...), $domainEvents)), AppendCondition::noConstraints());
+        $this->eventStore->append(Events::fromArray(array_map($this->eventSerializer->convertDomainEvent(...), $domainEvents)), AppendCondition::noConstraints());
     }
 
 

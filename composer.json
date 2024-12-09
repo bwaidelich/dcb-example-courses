@@ -19,24 +19,19 @@
       "url": "https://www.paypal.me/bwaidelich"
     }
   ],
-  "config": {
-    "platform": {
-      "php": "8.2"
-    }
-  },
   "require": {
-    "php": ">=8.2",
+    "php": ">=8.4",
     "ramsey/uuid": "^4.7",
     "webmozart/assert": "^1.11",
-    "wwwision/dcb-eventstore": "^2",
-    "wwwision/dcb-eventstore-doctrine": "^2"
+    "wwwision/dcb-eventstore": "@dev",
+    "wwwision/dcb-eventstore-doctrine": "@dev"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
-    "phpstan/phpstan": "^1.10",
+    "phpstan/phpstan": "^2",
     "squizlabs/php_codesniffer": "^4.0.x-dev",
-    "phpunit/phpunit": "^10.2",
-    "behat/behat": "^3.13"
+    "phpunit/phpunit": "^11",
+    "behat/behat": "^3"
   },
   "autoload": {
     "psr-4": {
@@ -49,14 +44,14 @@
     }
   },
   "scripts": {
-    "test-phpstan": "phpstan",
-    "test-cs": "phpcs --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
-    "test-cs:fix": "phpcbf --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
-    "test-behat": "behat",
+    "test:phpstan": "phpstan",
+    "test:cs": "phpcs --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
+    "test:cs:fix": "phpcbf --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
+    "test:behat": "behat",
     "test": [
-      "@test-phpstan",
-      "@test-cs",
-      "@test-behat"
+      "@test:phpstan",
+      "@test:cs",
+      "@test:behat"
     ]
   }
 }
