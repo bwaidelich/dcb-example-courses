@@ -2,3 +2,8 @@ parameters:
   level: 9
   paths:
     - src
+services:
+  -
+    class: Wwwision\DCBExample\Tests\PHPStan\DecisionModelPhpStanExtension
+    tags:
+      - phpstan.broker.dynamicMethodReturnTypeExtension

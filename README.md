@@ -17,18 +17,23 @@ This package models the example of this presentation (with a few deviations) usi
 
 ### Important Classes / Concepts
 
-* [Command](src%2FCommand) are just a concept of this example package. They implement the [Command Marker Interface](src%2FCommand%2FCommand.php)
+* [Commands](src%2FCommand) are just a concept of this example package. They implement the [Command Marker Interface](src%2FCommand%2FCommand.php)
 * The [CommandHandler](src/CommandHandler.php) is the central authority, handling and verifying incoming Command
-* ...it uses in-memory [Projections](src%2FProjection%2FProjection.php) to enforce hard constraints
-* The [Projections](src%2FProjection%2FProjection.php) are surprisingly small because they focus on a single responsibility
+* It uses in-memory [Projections](src%2FProjection%2FProjection.php) to enforce hard constraints
+* For each command handler a [DecisionModel](src%2FDecisionModel%2FDecisionModel.php) instance is built that contains the state of those in-memory projections and the [AppendCondition](https://github.com/bwaidelich/dcb-eventstore/blob/main/Specification.md#AppendCondition) for new events
 * The [EventSerializer](src%2FEventSerializer.php) can convert [DomainEvent](src%2FEvent%2DDomainEvent.php) instances to writable events, vice versa
-* This package contains no Read Model (i.e. classic projections) yet
+* *Note:* This package contains no Read Model (i.e. classic projections) yet
 
 ### Considerations / Findings
 
 I always had the feeling, that the focus on Event Streams is a distraction to Domain-driven design. So I was very happy to come across this concept.
-So far I didn't have the chance to test it in a real world scenario, but it makes a lot of sense to me and IMO this example shows, that the approach
-really works out in practice (in spite of some minor caveats in the current implementation).
+In the meantime I have had the chance to test it in multiple real world scenarios, and it works really well for me and simplifies things (in spite of some minor caveats in the current implementation):
+
+* It becomes trivial to enforce constraints involving multiple entities (like in this example).
+* Global uniqueness (aka "the unique username problem") can easily be achieved with DCB
+* Consecutive sequences (e.g. invoice number) can be done without reservation patterns and by only reading a single event per constraint check
+* When using composition like in this example, phe in-memory projections are surprisingly small because they focus on a single responsibility
+* ...and more
 
 ## Usage
 

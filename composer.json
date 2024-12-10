@@ -21,10 +21,9 @@
   ],
   "require": {
     "php": ">=8.4",
-    "ramsey/uuid": "^4.7",
     "webmozart/assert": "^1.11",
-    "wwwision/dcb-eventstore": "@dev",
-    "wwwision/dcb-eventstore-doctrine": "@dev"
+    "wwwision/dcb-eventstore": "^4",
+    "wwwision/dcb-eventstore-doctrine": "^4"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",

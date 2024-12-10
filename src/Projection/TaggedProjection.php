@@ -66,9 +66,6 @@ final class TaggedProjection implements Projection, StreamCriteriaAware
         $criteria = [];
         if ($this->wrapped instanceof StreamCriteriaAware) {
             foreach ($this->wrapped->getCriteria() as $criterion) {
-                if (!$criterion instanceof EventTypesAndTagsCriterion) {
-                    throw new RuntimeException(sprintf('%s only supports criteria of type %s, given: %s', self::class, EventTypesAndTagsCriterion::class, get_debug_type($criterion)));
-                }
                 $criteria[] = EventTypesAndTagsCriterion::create(
                     eventTypes: $criterion->eventTypes,
                     tags: $criterion->tags !== null ? $criterion->tags->merge($this->tags) : $this->tags,
