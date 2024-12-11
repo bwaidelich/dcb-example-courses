@@ -6,8 +6,7 @@ default:
       paths: ['%paths.base%/tests/Behat']
       contexts:
         - Wwwision\DCBExample\Tests\Behat\Bootstrap\FeatureContext:
-            #eventStoreDsn: 'pdo-pgsql://bwaidelich@127.0.0.1:5432/dcb'
-            eventStoreDsn: 'pdo-mysql://root:NwR2pEdKK@.UoUtHebFgH!br@127.0.0.1:3306/dcb'
+            #eventStoreDsn: 'sqlite:///events.sqlite'
   formatters:
     pretty: false
     progress: true
