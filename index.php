@@ -4,7 +4,6 @@ declare(strict_types=1);
 use Doctrine\DBAL\DriverManager;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
-use Wwwision\DCBExample\CommandHandler;
 use Wwwision\DCBExample\Command\Command;
 use Wwwision\DCBExample\Command\CreateCourse;
 use Wwwision\DCBExample\Command\RegisterStudent;
@@ -12,6 +11,7 @@ use Wwwision\DCBExample\Command\RenameCourse;
 use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
 use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
 use Wwwision\DCBExample\Command\UpdateCourseCapacity;
+use Wwwision\DCBExample\Domain\App;
 
 require __DIR__ . '/vendor/autoload.php';
 
@@ -30,8 +30,8 @@ $eventStore = DoctrineEventStore::create($connection, 'dcb_events');
 /** The {@see EventStore::setup()} method is used to make sure that the Events Store backend is set up (i.e. required tables are created and their schema up-to-date) **/
 $eventStore->setup();
 
-/** @var {@see CommandHandler} is the central authority to handle {@see Command}s */
-$commandHandler = new CommandHandler($eventStore);
+/** @var {@see App} is the central authority to handle {@see Command}s */
+$commandHandler = new App($eventStore);
 
 // Example:
 // 1. Create a course (c1)
