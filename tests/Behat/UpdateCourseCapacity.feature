@@ -30,7 +30,7 @@ Feature: Updating the capacity of a course
     And course "c1" capacity is changed to 3
     Then the command should be rejected with the following message:
       """
-      Constraint "numberOfCourseSubscriptionsIsBelowLimit" failed
+      Constraint "numberOfCourseSubscriptionsIsBelowCapacity" failed
       """
     And no events should be appended
 

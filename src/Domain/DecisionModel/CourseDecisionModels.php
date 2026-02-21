@@ -10,6 +10,7 @@ use Wwwision\DCBExample\Domain\Event\CourseDefined;
 use Wwwision\DCBExample\Domain\Event\CourseRenamed;
 use Wwwision\DCBExample\Domain\Event\StudentSubscribedToCourse;
 use Wwwision\DCBExample\Domain\Event\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\Domain\Projection\CourseProjections;
 use Wwwision\DCBExample\Domain\Types\CourseCapacity;
 use Wwwision\DCBExample\Domain\Types\CourseId;
 use Wwwision\DCBExample\Domain\Types\CourseTitle;
@@ -29,29 +30,19 @@ final readonly class CourseDecisionModels
 
     public static function exists(CourseId $courseId): Constraint
     {
-        $projection = AtomicProjection::create($courseId, initialState: false)
-            ->when(CourseDefined::class, true);
-
-        return Constraint::create('courseExists', $projection, static fn (bool $state) => $state);
-    }
-
-    /**
-     * @return Projection<CourseCapacity>
-     */
-    private static function capacity(CourseId $courseId): Projection
-    {
-        return AtomicProjection::create($courseId, initialState: CourseCapacity::fromInteger(0))
-            ->when(CourseDefined::class, fn($_, CourseDefined $event) => $event->initialCapacity)
-            ->when(CourseCapacityChanged::class, fn($_, CourseCapacityChanged $event) => $event->newCapacity)
-        ;
+        return Constraint::create(
+            key: 'courseExists',
+            wrappedProjection: CourseProjections::idIsUsed($courseId),
+            transformer: static fn (bool $state) => $state
+        );
     }
 
     public static function capacityEquals(CourseId $courseId, CourseCapacity $candidate): Constraint
     {
         return Constraint::create(
-            'courseCapacityEquals',
-            self::capacity($courseId),
-            static fn (CourseCapacity $currentCapacity) => $currentCapacity->equals($candidate)
+            key: 'courseCapacityEquals',
+            wrappedProjection: CourseProjections::capacity($courseId),
+            transformer: static fn (CourseCapacity $currentCapacity) => $currentCapacity->equals($candidate)
         );
     }
 
@@ -59,53 +50,31 @@ final readonly class CourseDecisionModels
     {
         /** @var CompositeProjection<object{courseCapacity: CourseCapacity, numberOfCourseSubscriptions: int}> $projection */
         $projection = CompositeProjection::create([
-            'courseCapacity' => self::capacity($courseId),
-            'numberOfCourseSubscriptions' => self::numberOfSubscriptions($courseId),
+            'courseCapacity' => CourseProjections::capacity($courseId),
+            'numberOfCourseSubscriptions' => CourseProjections::numberOfSubscriptions($courseId),
         ], stdClass::class);
         return Constraint::create(
-            'courseHasCapacity',
-            $projection,
-            static fn (object $state) => $state->courseCapacity->value > $state->numberOfCourseSubscriptions
+            key: 'courseHasCapacity',
+            wrappedProjection: $projection,
+            transformer: static fn (object $state) => $state->courseCapacity->value > $state->numberOfCourseSubscriptions
         );
     }
 
-    /**
-     * @return Projection<int>
-     */
-    private static function numberOfSubscriptions(CourseId $courseId): Projection
-    {
-        return AtomicProjection::create($courseId, initialState: 0)
-            ->when(StudentSubscribedToCourse::class, fn(int $state) => $state + 1)
-            ->when(StudentUnsubscribedFromCourse::class, fn(int $state) => $state - 1)
-        ;
-    }
-
-    public static function numberOfSubscriptionsIsBelowOrEqualTo(CourseId $courseId, int $value): Constraint
+    public static function numberOfSubscriptionsIsBelowCapacity(CourseId $courseId, int $capacity): Constraint
     {
         return Constraint::create(
-            'numberOfCourseSubscriptionsIsBelowLimit',
-            self::numberOfSubscriptions($courseId),
-            static fn (int $numberOfCourseSubscriptions) => $numberOfCourseSubscriptions <= $value
+            key: 'numberOfCourseSubscriptionsIsBelowCapacity',
+            wrappedProjection: CourseProjections::numberOfSubscriptions($courseId),
+            transformer: static fn (int $numberOfCourseSubscriptions) => $numberOfCourseSubscriptions <= $capacity
         );
-    }
-
-    /**
-     * @return Projection<CourseTitle>
-     */
-    private static function title(CourseId $courseId): Projection
-    {
-        return AtomicProjection::create($courseId, initialState: CourseTitle::fromString(''))
-            ->when(CourseDefined::class, static fn ($_, CourseDefined $event) => $event->courseTitle)
-            ->when(CourseRenamed::class, static fn ($_, CourseRenamed $event) => $event->newCourseTitle)
-        ;
     }
 
     public static function titleEquals(CourseId $courseId, CourseTitle $candidate): Constraint
     {
         return Constraint::create(
-            'courseTitleEquals',
-            self::title($courseId),
-            static fn (CourseTitle $currentTitle) => $currentTitle->equals($candidate)
+            key: 'courseTitleEquals',
+            wrappedProjection: CourseProjections::title($courseId),
+            transformer: static fn (CourseTitle $currentTitle) => $currentTitle->equals($candidate)
         );
     }
 }

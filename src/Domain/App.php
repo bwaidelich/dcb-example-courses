@@ -37,8 +37,6 @@ final readonly class App
 {
     private EventSerializer $eventSerializer;
 
-    private const int MAX_SUBSCRIPTIONS_PER_STUDENT = 10;
-
     public function __construct(
         private EventStore $eventStore,
     ) {
@@ -84,7 +82,7 @@ final readonly class App
                 Student::isRegistered($studentId),
                 Course::hasFreeSeats($courseId),
                 not(Student::isSubscribedToCourse($studentId, $courseId)),
-                Student::numberOfSubscriptionsIsBelow($studentId, self::MAX_SUBSCRIPTIONS_PER_STUDENT),
+                Student::numberOfSubscriptionsIsBelowLimit($studentId),
             ),
             fn () => new StudentSubscribedToCourse($courseId, $studentId),
         );
@@ -108,7 +106,7 @@ final readonly class App
             Constraints::create(
                 Course::exists($courseId),
                 not(Course::capacityEquals($courseId, $newCapacity)),
-                Course::numberOfSubscriptionsIsBelowOrEqualTo($courseId, $newCapacity->value),
+                Course::numberOfSubscriptionsIsBelowCapacity($courseId, $newCapacity->value),
             ),
             static fn () => new CourseCapacityChanged($courseId, $newCapacity),
         );
