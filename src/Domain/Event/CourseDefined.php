@@ -8,11 +8,12 @@ use Webmozart\Assert\Assert;
 use Wwwision\DCBExample\Domain\Types\CourseCapacity;
 use Wwwision\DCBExample\Domain\Types\CourseId;
 use Wwwision\DCBExample\Domain\Types\CourseTitle;
+use Wwwision\DCBExample\Infrastructure\DomainEvent;
 
 /**
  * Domain Event that occurs when a new course was created
  */
-final readonly class CourseDefined implements CourseEvent
+final readonly class CourseDefined implements DomainEvent
 {
     public function __construct(
         public CourseId $courseId,

@@ -7,13 +7,14 @@ namespace Wwwision\DCBExample\Domain\Event;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBExample\Domain\Types\CourseId;
 use Wwwision\DCBExample\Domain\Types\StudentId;
+use Wwwision\DCBExample\Infrastructure\DomainEvent;
 
 /**
  * Domain Event that occurs when a student was subscribed to a course
  *
  * Note: This event affects two entities (course and student)!
  */
-final readonly class StudentSubscribedToCourse implements CourseEvent, StudentEvent
+final readonly class StudentSubscribedToCourse implements DomainEvent
 {
     public function __construct(
         public CourseId $courseId,

@@ -6,11 +6,12 @@ namespace Wwwision\DCBExample\Domain\Event;
 
 use Webmozart\Assert\Assert;
 use Wwwision\DCBExample\Domain\Types\StudentId;
+use Wwwision\DCBExample\Infrastructure\DomainEvent;
 
 /**
  * Domain Event that occurs when a new student was registered in the system
  */
-final readonly class StudentRegistered implements StudentEvent
+final readonly class StudentRegistered implements DomainEvent
 {
     public function __construct(
         public StudentId $studentId,

@@ -8,11 +8,12 @@ use JsonException;
 use RuntimeException;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\Event\Event;
+use Wwwision\DCBEventStore\Event\Tags;
 use Wwwision\DCBEventStore\SequencedEvent\SequencedEvent;
-use Wwwision\DCBExample\Domain\Event\CourseEvent;
-use Wwwision\DCBExample\Domain\Event\StudentEvent;
+use Wwwision\DCBExample\Infrastructure\ProvidesTags;
 
 use function get_debug_type;
+use function get_object_vars;
 use function json_decode;
 use function json_encode;
 use function sprintf;
@@ -54,12 +55,11 @@ final readonly class EventSerializer
         } catch (JsonException $e) {
             throw new RuntimeException(sprintf('Failed to JSON encode payload of domain event %s: %s', get_debug_type($domainEvent), $e->getMessage()), 1685965020, $e);
         }
-        $tags = [];
-        if ($domainEvent instanceof CourseEvent) {
-            $tags[] = "course:{$domainEvent->courseId->value}";
-        }
-        if ($domainEvent instanceof StudentEvent) {
-            $tags[] = "student:{$domainEvent->studentId->value}";
+        $tags = Tags::create();
+        foreach (get_object_vars($domainEvent) as $value) {
+            if ($value instanceof ProvidesTags) {
+                $tags = $tags->merge($value->tags());
+            }
         }
         return Event::create(
             type: substr($domainEvent::class, strrpos($domainEvent::class, '\\') + 1),

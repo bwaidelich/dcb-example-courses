@@ -7,11 +7,12 @@ namespace Wwwision\DCBExample\Domain\Event;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBExample\Domain\Types\CourseCapacity;
 use Wwwision\DCBExample\Domain\Types\CourseId;
+use Wwwision\DCBExample\Infrastructure\DomainEvent;
 
 /**
  * Domain Event that occurs when the total capacity of a course has changed
  */
-final readonly class CourseCapacityChanged implements CourseEvent
+final readonly class CourseCapacityChanged implements DomainEvent
 {
     public function __construct(
         public CourseId $courseId,
