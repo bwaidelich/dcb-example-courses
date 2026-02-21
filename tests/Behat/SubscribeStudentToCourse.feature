@@ -5,7 +5,7 @@ Feature: Subscribing students to courses
     When student "non-existing" subscribes to course "c1"
     Then the command should be rejected with the following message:
       """
-      Failed to subscribe student with id "non-existing" to course with id "c1" because a student with that id does not exist
+      Constraint "studentIsRegistered" failed
       """
     And no events should be appended
 
@@ -15,7 +15,7 @@ Feature: Subscribing students to courses
     When student "s1" subscribes to course "non-existing"
     Then the command should be rejected with the following message:
       """
-      Failed to subscribe student with id "s1" to course with id "non-existing" because a course with that id does not exist
+      Constraint "courseExists" failed
       """
     And no events should be appended
 
@@ -26,7 +26,7 @@ Feature: Subscribing students to courses
     When student "s1" subscribes to course "c1"
     Then the command should be rejected with the following message:
       """
-      Failed to subscribe student with id "s1" to course with id "c1" because that student is already subscribed to this course
+      Constraint "notStudentSubscribedToCourse" failed
       """
     And no events should be appended
 
@@ -39,7 +39,7 @@ Feature: Subscribing students to courses
     And student "s4" subscribes to course "c1"
     Then the command should be rejected with the following message:
       """
-      Failed to subscribe student with id "s4" to course with id "c1" because the course's capacity of 3 is reached
+      Constraint "courseHasCapacity" failed
       """
     And no events should be appended
 
@@ -50,7 +50,7 @@ Feature: Subscribing students to courses
     When student "s1" subscribes to course "c11"
     Then the command should be rejected with the following message:
       """
-      Failed to subscribe student with id "s1" to course with id "c11" because that student is already subscribed the maximum of 10 courses
+      Constraint "numberOfStudentSubscriptionsIsBelowLimit" failed
       """
     And no events should be appended
 
@@ -61,7 +61,7 @@ Feature: Subscribing students to courses
     When student "s1" subscribes to course "c10"
     Then the following events should be read:
       | Type                        | Tags                        |
-      | "CourseCreated"             | ["course:c10"]              |
+      | "CourseDefined"             | ["course:c10"]              |
       | "StudentRegistered"         | ["student:s1"]              |
       | "StudentSubscribedToCourse" | ["course:c1", "student:s1"] |
       | "StudentSubscribedToCourse" | ["course:c2", "student:s1"] |

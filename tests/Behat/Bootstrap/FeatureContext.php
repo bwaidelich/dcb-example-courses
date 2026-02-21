@@ -6,20 +6,20 @@ namespace Wwwision\DCBExample\Tests\Behat\Bootstrap;
 use Behat\Behat\Context\Context;
 use Behat\Gherkin\Node\PyStringNode;
 use Behat\Gherkin\Node\TableNode;
+use Closure;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SqlitePlatform;
 use InvalidArgumentException;
 use PHPUnit\Framework\Assert;
+use Wwwision\DCBEventStore\AppendCondition\AppendCondition;
+use Wwwision\DCBEventStore\Event\Event;
+use Wwwision\DCBEventStore\Event\Events;
 use Wwwision\DCBEventStore\EventStore;
-use Wwwision\DCBEventStore\EventStream;
-use Wwwision\DCBEventStore\Helpers\InMemoryEventStream;
-use Wwwision\DCBEventStore\Types\AppendCondition;
-use Wwwision\DCBEventStore\Types\Event;
-use Wwwision\DCBEventStore\Types\Events;
-use Wwwision\DCBEventStore\Types\ReadOptions;
-use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
+use Wwwision\DCBEventStore\Query\Query;
+use Wwwision\DCBEventStore\ReadOptions;
+use Wwwision\DCBEventStore\SequencedEvent\SequencedEvents;
 use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
 use Wwwision\DCBExample\Command\Command;
 use Wwwision\DCBExample\Command\CreateCourse;
@@ -28,18 +28,18 @@ use Wwwision\DCBExample\Command\RenameCourse;
 use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
 use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
 use Wwwision\DCBExample\Command\UpdateCourseCapacity;
-use Wwwision\DCBExample\CommandHandler;
-use Wwwision\DCBExample\Event\CourseCreated;
-use Wwwision\DCBExample\Event\DomainEvent;
-use Wwwision\DCBExample\Event\StudentRegistered;
-use Wwwision\DCBExample\Event\StudentSubscribedToCourse;
-use Wwwision\DCBExample\Event\StudentUnsubscribedFromCourse;
-use Wwwision\DCBExample\EventSerializer;
-use Wwwision\DCBExample\Exception\ConstraintException;
-use Wwwision\DCBExample\Types\CourseCapacity;
-use Wwwision\DCBExample\Types\CourseId;
-use Wwwision\DCBExample\Types\CourseTitle;
-use Wwwision\DCBExample\Types\StudentId;
+use Wwwision\DCBExample\Domain\App;
+use Wwwision\DCBExample\Domain\Event\CourseDefined;
+use Wwwision\DCBExample\Domain\Event\StudentRegistered;
+use Wwwision\DCBExample\Domain\Event\StudentSubscribedToCourse;
+use Wwwision\DCBExample\Domain\Event\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\Domain\Types\CourseCapacity;
+use Wwwision\DCBExample\Domain\Types\CourseId;
+use Wwwision\DCBExample\Domain\Types\CourseTitle;
+use Wwwision\DCBExample\Domain\Types\StudentId;
+use Wwwision\DCBExample\Infrastructure\DomainEvent;
+use Wwwision\DCBExample\Infrastructure\EventSerializer;
+use Wwwision\DCBExample\Infrastructure\Exception\ConstraintException;
 
 use function array_diff;
 use function array_keys;
@@ -56,7 +56,7 @@ final class FeatureContext implements Context
     private Connection $eventStoreConnection;
     private EventStore $eventStore;
 
-    private CommandHandler $commandHandler;
+    private App $app;
     private EventSerializer $eventSerializer;
 
     private ?ConstraintException $lastConstraintException = null;
@@ -84,18 +84,18 @@ final class FeatureContext implements Context
                 $this->inner->setup();
             }
 
-            public function read(StreamQuery $query, ReadOptions|null $options = null): EventStream
+            public function read(Query $query, ReadOptions|null $options = null): SequencedEvents
             {
                 $innerStream = $this->inner->read($query, $options);
-                $eventEnvelopes = [];
-                foreach ($innerStream as $eventEnvelope) {
-                    $this->readEvents = $this->readEvents->append($eventEnvelope->event);
-                    $eventEnvelopes[] = $eventEnvelope;
-                }
-                return InMemoryEventStream::create(...$eventEnvelopes);
+                return SequencedEvents::create(function () use ($innerStream) {
+                    foreach ($innerStream as $sequencedEvent) {
+                        $this->readEvents = $this->readEvents->append($sequencedEvent->event);
+                        yield $sequencedEvent;
+                    }
+                });
             }
 
-            public function append(Events|Event $events, AppendCondition $condition): void
+            public function append(Events|Event $events, AppendCondition|null $condition = null): void
             {
                 $this->inner->append($events, $condition);
                 if ($events instanceof Event) {
@@ -104,8 +104,8 @@ final class FeatureContext implements Context
                 $this->appendedEvents = $events;
             }
         };
-        $this->commandHandler = new CommandHandler($this->eventStore);
-        $this->eventSerializer = new EventSerializer();
+        $this->app = new App($this->eventStore);
+        $this->eventSerializer = new EventSerializer('\\Wwwision\\DCBExample\\Domain\\Event');
     }
 
     /**
@@ -146,7 +146,7 @@ final class FeatureContext implements Context
     {
         $domainEvents = [];
         foreach (explode(',', $courseIds) as $courseId) {
-            $domainEvents[] = new CourseCreated(
+            $domainEvents[] = new CourseDefined(
                 CourseId::fromString($courseId),
                 CourseCapacity::fromInteger($initialCapacity ?? 10),
                 courseTitle::fromString($courseTitle ?? ('course ' . $courseId)),
@@ -201,19 +201,18 @@ final class FeatureContext implements Context
     // -------------- COMMANDS ----------------------
 
     /**
-     * @When a new course is created with id :courseId, title :courseTitle and capacity of :initialCapacity
-     * @When a new course is created with id :courseId and capacity of :initialCapacity
-     * @When a new course is created with id :courseId and title :courseTitle
-     * @When a new course is created with id :courseId
+     * @When a new course is defined with id :courseId, title :courseTitle and capacity of :initialCapacity
+     * @When a new course is defined with id :courseId and capacity of :initialCapacity
+     * @When a new course is defined with id :courseId and title :courseTitle
+     * @When a new course is defined with id :courseId
      */
-    public function aNewCourseIsCreated(string $courseId, string|null $courseTitle = null, int|null $initialCapacity = null): void
+    public function aNewCourseIsDefined(string $courseId, string $courseTitle = 'Course Title', int $initialCapacity = 10): void
     {
-        $command = CreateCourse::create(
-            courseId: $courseId,
-            initialCapacity: $initialCapacity ?? 10,
-            courseTitle: $courseTitle ?? ('course ' . $courseId),
-        );
-        $this->handleCommandAndCatchException($command);
+        $this->tryAndCatchException(fn () => $this->app->defineCourse(
+            CourseId::fromString($courseId),
+            CourseTitle::fromString($courseTitle),
+            CourseCapacity::fromInteger($initialCapacity)
+        ));
     }
 
     /**
@@ -221,11 +220,10 @@ final class FeatureContext implements Context
      */
     public function courseIsRenamed(string $courseId, string $newCourseTitle): void
     {
-        $command = RenameCourse::create(
-            courseId: $courseId,
-            newCourseTitle: $newCourseTitle,
-        );
-        $this->handleCommandAndCatchException($command);
+        $this->tryAndCatchException(fn () => $this->app->renameCourse(
+            CourseId::fromString($courseId),
+            CourseTitle::fromString($newCourseTitle),
+        ));
     }
 
     /**
@@ -233,22 +231,20 @@ final class FeatureContext implements Context
      */
     public function courseCapacityIsChanged(string $courseId, int $newCapacity): void
     {
-        $command = UpdateCourseCapacity::create(
-            courseId: $courseId,
-            newCapacity: $newCapacity,
-        );
-        $this->handleCommandAndCatchException($command);
+        $this->tryAndCatchException(fn () => $this->app->changeCourseCapacity(
+            CourseId::fromString($courseId),
+            CourseCapacity::fromInteger($newCapacity),
+        ));
     }
 
     /**
      * @When a new student is registered with id :studentId
      */
-    public function aNewCourseIsRegistered(string $studentId): void
+    public function aNewStudentIsRegistered(string $studentId): void
     {
-        $command = RegisterStudent::create(
+        $this->tryAndCatchException(fn () => $this->app->registerStudent(
             StudentId::fromString($studentId),
-        );
-        $this->handleCommandAndCatchException($command);
+        ));
     }
 
     /**
@@ -256,11 +252,10 @@ final class FeatureContext implements Context
      */
     public function studentSubscribesToCourse(string $studentId, string $courseId): void
     {
-        $command = SubscribeStudentToCourse::create(
-            CourseId::fromString($courseId),
+        $this->tryAndCatchException(fn () => $this->app->subscribeStudentToCourse(
             StudentId::fromString($studentId),
-        );
-        $this->handleCommandAndCatchException($command);
+            CourseId::fromString($courseId),
+        ));
     }
 
     /**
@@ -268,11 +263,10 @@ final class FeatureContext implements Context
      */
     public function studentUnsubscribesFromCourse(string $studentId, string $courseId): void
     {
-        $command = UnsubscribeStudentFromCourse::create(
-            CourseId::fromString($courseId),
+        $this->tryAndCatchException(fn () => $this->app->unsubscribeStudentFromCourse(
             StudentId::fromString($studentId),
-        );
-        $this->handleCommandAndCatchException($command);
+            CourseId::fromString($courseId),
+        ));
     }
 
     /**
@@ -358,12 +352,12 @@ final class FeatureContext implements Context
 
     // ----------------------------
 
-    private function handleCommandAndCatchException(Command $command): void
+    private function tryAndCatchException(Closure $handler): void
     {
         $this->eventStore->appendedEvents = Events::none();
         $this->eventStore->readEvents = Events::none();
         try {
-            $this->commandHandler->handle($command);
+            $handler();
         } catch (ConstraintException $exception) {
             $this->lastConstraintException = $exception;
         }
@@ -371,7 +365,7 @@ final class FeatureContext implements Context
 
     private function appendEvents(DomainEvent ...$domainEvents): void
     {
-        $this->eventStore->append(Events::fromArray(array_map($this->eventSerializer->convertDomainEvent(...), $domainEvents)), AppendCondition::noConstraints());
+        $this->eventStore->append(Events::fromArray(array_map($this->eventSerializer->convertDomainEvent(...), $domainEvents)));
     }
 
 

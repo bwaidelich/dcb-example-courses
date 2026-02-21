@@ -5,7 +5,7 @@ Feature: Renaming courses
     When course "non-existing" is renamed to "New course Title"
     Then the command should be rejected with the following message:
       """
-      Failed to rename course with id "non-existing" because a course with that id does not exist
+      Constraint "courseExists" failed
       """
     And no events should be appended
 
@@ -14,7 +14,7 @@ Feature: Renaming courses
     When course "c1" is renamed to "course 01"
     Then the command should be rejected with the following message:
       """
-      Failed to rename course with id "c1" to "course 01" because this is already the title of this course
+      Constraint "notCourseTitleEquals" failed
       """
     And no events should be appended
 
@@ -23,7 +23,7 @@ Feature: Renaming courses
     When course "c1" is renamed to "course 01 renamed"
     Then the following events should be read:
       | Type            | Tags          |
-      | "CourseCreated" | ["course:c1"] |
+      | "CourseDefined" | ["course:c1"] |
     And the command should pass without errors
     And the following event should be appended:
       | Type            | Data                                                      | Tags          |
@@ -36,7 +36,7 @@ Feature: Renaming courses
     When course "c1" is renamed to "course 01 renamed 3"
     Then the following events should be read:
       | Type            | Tags          |
-      | "CourseCreated" | ["course:c1"] |
+      | "CourseDefined" | ["course:c1"] |
       | "CourseRenamed" | ["course:c1"] |
       | "CourseRenamed" | ["course:c1"] |
     And the command should pass without errors

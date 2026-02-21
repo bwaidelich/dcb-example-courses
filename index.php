@@ -4,14 +4,11 @@ declare(strict_types=1);
 use Doctrine\DBAL\DriverManager;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
-use Wwwision\DCBExample\CommandHandler;
-use Wwwision\DCBExample\Command\Command;
-use Wwwision\DCBExample\Command\CreateCourse;
-use Wwwision\DCBExample\Command\RegisterStudent;
-use Wwwision\DCBExample\Command\RenameCourse;
-use Wwwision\DCBExample\Command\SubscribeStudentToCourse;
-use Wwwision\DCBExample\Command\UnsubscribeStudentFromCourse;
-use Wwwision\DCBExample\Command\UpdateCourseCapacity;
+use Wwwision\DCBExample\Domain\App;
+use Wwwision\DCBExample\Domain\Types\CourseCapacity;
+use Wwwision\DCBExample\Domain\Types\CourseId;
+use Wwwision\DCBExample\Domain\Types\CourseTitle;
+use Wwwision\DCBExample\Domain\Types\StudentId;
 
 require __DIR__ . '/vendor/autoload.php';
 
@@ -30,24 +27,24 @@ $eventStore = DoctrineEventStore::create($connection, 'dcb_events');
 /** The {@see EventStore::setup()} method is used to make sure that the Events Store backend is set up (i.e. required tables are created and their schema up-to-date) **/
 $eventStore->setup();
 
-/** @var {@see CommandHandler} is the central authority to handle {@see Command}s */
-$commandHandler = new CommandHandler($eventStore);
+/** @var {@see App} is the central authority to handle {@see Command}s */
+$app = new App($eventStore);
 
 // Example:
-// 1. Create a course (c1)
-$commandHandler->handle(CreateCourse::create(courseId: 'c1', initialCapacity: 10, courseTitle: 'Course 02'));
+// 1. Define a course (c1)
+$app->defineCourse(CourseId::fromString('c1'), CourseTitle::fromString('Course 01'), CourseCapacity::fromInteger(10));
 
-// 2. rename it, register a student (s1) and subscribe it to the course, change the course capacity, unregister the student
-$commandHandler->handle(RenameCourse::create(courseId: 'c1', newCourseTitle: 'Course 01 renamed'));
+// 2. rename it
+$app->renameCourse(CourseId::fromString('c1'), CourseTitle::fromString('Course 01 renamed'));
 
 // 3. register a student (s1) in the system
-$commandHandler->handle(RegisterStudent::create(studentId: 's1'));
+$app->registerStudent(StudentId::fromString('s1'));
 
 // 4. subscribe student (s1) to course (s1)
-$commandHandler->handle(SubscribeStudentToCourse::create(courseId: 'c1', studentId: 's1'));
+$app->subscribeStudentToCourse(StudentId::fromString('s1'), CourseId::fromString('c1'));
 
 // 5. change capacity of course (c1) to 5
-$commandHandler->handle(UpdateCourseCapacity::create(courseId: 'c1', newCapacity: 5));
+$app->changeCourseCapacity(CourseId::fromString('c1'), CourseCapacity::fromInteger(5));
 
 // 6. unsubscribe student (s1) from course (c1)
-$commandHandler->handle(UnsubscribeStudentFromCourse::create(courseId: 'c1', studentId: 's1'));
+$app->unsubscribeStudentFromCourse(StudentId::fromString('s1'), CourseId::fromString('c1'));
