@@ -9,7 +9,7 @@ use Wwwision\DCBExample\Domain\Types\CourseCapacity;
 use Wwwision\DCBExample\Domain\Types\CourseId;
 
 /**
- * Domain Events that occurs when the total capacity of a course has changed
+ * Domain Event that occurs when the total capacity of a course has changed
  */
 final readonly class CourseCapacityChanged implements CourseEvent
 {

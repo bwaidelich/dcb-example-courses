@@ -10,7 +10,7 @@ use Wwwision\DCBExample\Domain\Types\CourseId;
 use Wwwision\DCBExample\Domain\Types\CourseTitle;
 
 /**
- * Domain Events that occurs when a new course was created
+ * Domain Event that occurs when a new course was created
  */
 final readonly class CourseDefined implements CourseEvent
 {

@@ -9,7 +9,7 @@ use Wwwision\DCBExample\Domain\Types\CourseId;
 use Wwwision\DCBExample\Domain\Types\CourseTitle;
 
 /**
- * Domain Events that occurs when the title of a course has changed
+ * Domain Event that occurs when the title of a course has changed
  */
 final readonly class CourseRenamed implements CourseEvent
 {

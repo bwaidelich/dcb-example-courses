@@ -9,7 +9,7 @@ use Wwwision\DCBExample\Domain\Types\CourseId;
 use Wwwision\DCBExample\Domain\Types\StudentId;
 
 /**
- * Domain Events that occurs when a student was unsubscribed from a course
+ * Domain Event that occurs when a student was unsubscribed from a course
  *
  * Note: This event affects two entities (course and student)!
  */

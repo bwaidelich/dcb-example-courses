@@ -8,7 +8,7 @@ use Webmozart\Assert\Assert;
 use Wwwision\DCBExample\Domain\Types\StudentId;
 
 /**
- * Domain Events that occurs when a new student was registered in the system
+ * Domain Event that occurs when a new student was registered in the system
  */
 final readonly class StudentRegistered implements StudentEvent
 {
