@@ -4,11 +4,19 @@ declare(strict_types=1);
 use Doctrine\DBAL\DriverManager;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStoreDoctrine\DoctrineEventStore;
-use Wwwision\DCBExample\Domain\App;
-use Wwwision\DCBExample\Domain\Types\CourseCapacity;
-use Wwwision\DCBExample\Domain\Types\CourseId;
-use Wwwision\DCBExample\Domain\Types\CourseTitle;
-use Wwwision\DCBExample\Domain\Types\StudentId;
+use Wwwision\DCBExample\App;
+use Wwwision\DCBExample\Features\CourseSubscription\Events\StudentSubscribedToCourse;
+use Wwwision\DCBExample\Features\CourseSubscription\Events\StudentUnsubscribedFromCourse;
+use Wwwision\DCBExample\Features\DefineCourse\Events\CourseCapacityChanged;
+use Wwwision\DCBExample\Features\DefineCourse\Events\CourseDefined;
+use Wwwision\DCBExample\Features\DefineCourse\Events\CourseRenamed;
+use Wwwision\DCBExample\Features\RegisterStudent\Events\StudentRegistered;
+use Wwwision\DCBExample\Model\Course\Dto\CourseCapacity;
+use Wwwision\DCBExample\Model\Course\Dto\CourseId;
+use Wwwision\DCBExample\Model\Course\Dto\CourseTitle;
+use Wwwision\DCBExample\Model\Student\Dto\StudentId;
+use Wwwision\DCBTools\DomainEventAppender;
+use Wwwision\DCBTools\Serialization\SimpleEventSerializer;
 
 require __DIR__ . '/vendor/autoload.php';
 
@@ -27,24 +35,35 @@ $eventStore = DoctrineEventStore::create($connection, 'dcb_events');
 /** The {@see EventStore::setup()} method is used to make sure that the Events Store backend is set up (i.e. required tables are created and their schema up-to-date) **/
 $eventStore->setup();
 
+$eventSerializer = new SimpleEventSerializer([
+    CourseCapacityChanged::class,
+    CourseDefined::class,
+    CourseRenamed::class,
+    StudentRegistered::class,
+    StudentSubscribedToCourse::class,
+    StudentUnsubscribedFromCourse::class,
+]);
+
+$domainEventAppender = new DomainEventAppender($eventStore, $eventSerializer);
+
 /** @var {@see App} is the central authority to handle {@see Command}s */
-$app = new App($eventStore);
+$app = new App($domainEventAppender);
 
 // Example:
 // 1. Define a course (c1)
-$app->defineCourse(CourseId::fromString('c1'), CourseTitle::fromString('Course 01'), CourseCapacity::fromInteger(10));
+$app->defineCourse('c1', 'Course 01', 10);
 
 // 2. rename it
-$app->renameCourse(CourseId::fromString('c1'), CourseTitle::fromString('Course 01 renamed'));
+$app->renameCourse('c1', 'Course 01 renamed');
 
 // 3. register a student (s1) in the system
-$app->registerStudent(StudentId::fromString('s1'));
+$app->registerStudent('s1');
 
 // 4. subscribe student (s1) to course (s1)
-$app->subscribeStudentToCourse(StudentId::fromString('s1'), CourseId::fromString('c1'));
+$app->subscribeStudentToCourse('s1', 'c1');
 
 // 5. change capacity of course (c1) to 5
-$app->changeCourseCapacity(CourseId::fromString('c1'), CourseCapacity::fromInteger(5));
+$app->changeCourseCapacity('c1', 5);
 
 // 6. unsubscribe student (s1) from course (c1)
-$app->unsubscribeStudentFromCourse(StudentId::fromString('s1'), CourseId::fromString('c1'));
+$app->unsubscribeStudentFromCourse('s1', 'c1');

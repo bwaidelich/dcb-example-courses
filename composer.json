@@ -23,7 +23,8 @@
     "php": ">=8.4",
     "webmozart/assert": "^1.11",
     "wwwision/dcb-eventstore": "^5",
-    "wwwision/dcb-eventstore-doctrine": "^5"
+    "wwwision/dcb-eventstore-doctrine": "^5",
+    "wwwision/dcb-tools": "@dev"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
@@ -35,10 +36,7 @@
   "autoload": {
     "psr-4": {
       "Wwwision\\DCBExample\\": "src/"
-    },
-    "files": [
-      "src/Infrastructure/functions.php"
-    ]
+    }
   },
   "autoload-dev": {
     "psr-4": {
