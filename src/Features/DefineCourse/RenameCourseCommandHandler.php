@@ -14,13 +14,13 @@ use function Wwwision\DCBTools\not;
 final readonly class RenameCourseCommandHandler
 {
     public function __construct(
-        private DomainEventAppender $domainEventAppender,
+        private DomainEventAppender $eventStore,
     ) {
     }
 
     public function __invoke(RenameCourse $command): void
     {
-        $this->domainEventAppender->append(
+        $this->eventStore->append(
             constraints: [
                 Course::exists($command->courseId),
                 not(Course::titleEquals($command->courseId, $command->newTitle)),

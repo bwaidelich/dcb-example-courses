@@ -20,10 +20,10 @@
     }
   ],
   "require": {
-    "php": ">=8.4",
+    "php": ">=8.5",
     "webmozart/assert": "^1.11",
     "wwwision/dcb-eventstore": "^5",
-    "wwwision/dcb-eventstore-doctrine": "^5",
+    "wwwision/dcb-eventstore-doctrine": "^6",
     "wwwision/dcb-tools": "@dev"
   },
   "require-dev": {

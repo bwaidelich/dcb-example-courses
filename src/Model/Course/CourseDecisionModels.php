@@ -7,7 +7,11 @@ namespace Wwwision\DCBExample\Model\Course;
 use stdClass;
 use Wwwision\DCBExample\Model\Course\Dto\CourseCapacity;
 use Wwwision\DCBExample\Model\Course\Dto\CourseId;
+use Wwwision\DCBExample\Model\Course\Dto\CourseIds;
+use Wwwision\DCBExample\Model\Course\Dto\CourseSchedules;
 use Wwwision\DCBExample\Model\Course\Dto\CourseTitle;
+use Wwwision\DCBExample\Model\Student\Dto\StudentId;
+use Wwwision\DCBExample\Model\Student\Dto\StudentIds;
 use Wwwision\DCBTools\DecisionModel\Constraint;
 use Wwwision\DCBTools\Projection\CompositeProjection;
 
@@ -26,6 +30,20 @@ final readonly class CourseDecisionModels
             name: 'courseExists',
             projection: CourseProjections::idIsUsed($courseId),
             predicate: static fn (bool $state) => $state
+        );
+    }
+
+    public static function hasNoScheduleConflicts(CourseId $referenceCourseId, CourseIds $courseIds): Constraint
+    {
+        $projections = [CourseProjections::schedule($referenceCourseId)];
+        foreach ($courseIds as $courseId) {
+            $projections[] = CourseProjections::schedule($courseId);
+        }
+        $projection = CompositeProjection::create($projections, CourseSchedules::class);
+        return Constraint::create(
+            name: __FUNCTION__,
+            projection: $projection,
+            predicate: static fn (CourseSchedules $schedules) => !$schedules->hasOverlaps(),
         );
     }
 
@@ -58,6 +76,15 @@ final readonly class CourseDecisionModels
             name: 'numberOfCourseSubscriptionsIsBelowCapacity',
             projection: CourseProjections::numberOfSubscriptions($courseId),
             predicate: static fn (int $numberOfCourseSubscriptions) => $numberOfCourseSubscriptions <= $capacity
+        );
+    }
+
+    public static function hasMatchingSubscriptions(CourseId $courseId, StudentIds $studentIds): Constraint
+    {
+        return Constraint::create(
+            name: __FUNCTION__,
+            projection: CourseProjections::subscribedStudents($courseId),
+            predicate: static fn (StudentIds $subscribedStudentIds) => $studentIds->intersects($subscribedStudentIds),
         );
     }
 

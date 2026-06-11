@@ -14,13 +14,13 @@ use function Wwwision\DCBTools\not;
 final readonly class RegisterStudentCommandHandler
 {
     public function __construct(
-        private DomainEventAppender $domainEventAppender,
+        private DomainEventAppender $eventStore,
     ) {
     }
 
     public function __invoke(RegisterStudent $command): void
     {
-        $this->domainEventAppender->append(
+        $this->eventStore->append(
             constraints: [
                 not(Student::isRegistered($command->studentId))
             ],

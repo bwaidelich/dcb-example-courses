@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Wwwision\DCBExample\Features\DefineCourse;
 
 use Wwwision\DCBExample\Features\DefineCourse\Commands\ChangeCourseCapacity;
-use Wwwision\DCBExample\Features\DefineCourse\Commands\RenameCourse;
 use Wwwision\DCBExample\Features\DefineCourse\Events\CourseCapacityChanged;
-use Wwwision\DCBExample\Features\DefineCourse\Events\CourseRenamed;
 use Wwwision\DCBExample\Model\Course\CourseDecisionModels as Course;
 use Wwwision\DCBTools\DomainEventAppender;
 
@@ -16,13 +14,13 @@ use function Wwwision\DCBTools\not;
 final readonly class ChangeCourseCapacityCommandHandler
 {
     public function __construct(
-        private DomainEventAppender $domainEventAppender,
+        private DomainEventAppender $eventStore,
     ) {
     }
 
     public function __invoke(ChangeCourseCapacity $command): void
     {
-        $this->domainEventAppender->append(
+        $this->eventStore->append(
             constraints: [
                 Course::exists($command->courseId),
                 not(Course::capacityEquals($command->courseId, $command->newCapacity)),

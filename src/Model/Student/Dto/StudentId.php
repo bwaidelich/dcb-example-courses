@@ -27,6 +27,11 @@ final readonly class StudentId implements ProvidesTags, JsonSerializable
         return $this->value;
     }
 
+    public function equals(self $other): bool
+    {
+        return $other->value === $this->value;
+    }
+
     public function tags(): Tag
     {
         return Tag::fromString("student:$this->value");

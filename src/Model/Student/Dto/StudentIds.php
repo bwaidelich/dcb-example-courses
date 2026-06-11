@@ -2,14 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Wwwision\DCBExample\Model\Course\Dto;
+namespace Wwwision\DCBExample\Model\Student\Dto;
 
 use ArrayIterator;
 use Closure;
 use Countable;
 use IteratorAggregate;
 use Traversable;
-use Wwwision\DCBEventStore\Event\Tag;
 use Wwwision\DCBEventStore\Event\Tags;
 use Wwwision\DCBTools\Event\ProvidesTags;
 
@@ -17,22 +16,22 @@ use function array_filter;
 use function array_map;
 
 /**
- * A type-safe set of {@see CourseId} instances
+ * A type-safe set of {@see StudentId} instances
  *
- * @implements IteratorAggregate<CourseId>
+ * @implements IteratorAggregate<StudentId>
  */
-final class CourseIds implements IteratorAggregate, Countable, ProvidesTags
+final class StudentIds implements IteratorAggregate, Countable, ProvidesTags
 {
     /**
-     * @param CourseId[] $ids
+     * @param StudentId[] $ids
      */
     private function __construct(
         private readonly array $ids,
     ) {
-        //Assert::notEmpty($this->ids, 'CourseIds must not be empty');
+        //Assert::notEmpty($this->ids, 'StudentIds must not be empty');
     }
 
-    public static function create(CourseId ...$ids): self
+    public static function create(StudentId ...$ids): self
     {
         return new self($ids);
     }
@@ -44,10 +43,10 @@ final class CourseIds implements IteratorAggregate, Countable, ProvidesTags
 
     public static function fromStrings(string ...$ids): self
     {
-        return new self(array_map(static fn (string $type) => CourseId::fromString($type), $ids));
+        return new self(array_map(static fn (string $type) => StudentId::fromString($type), $ids));
     }
 
-    public function contains(CourseId $id): bool
+    public function contains(StudentId $id): bool
     {
         foreach ($this->ids as $existingId) {
             if ($existingId->equals($id)) {
@@ -57,20 +56,33 @@ final class CourseIds implements IteratorAggregate, Countable, ProvidesTags
         return false;
     }
 
-    public function with(CourseId $courseId): self
+    /**
+     * Returns true if this set intersects with the given set
+     */
+    public function intersects(self $other): bool
     {
-        if ($this->contains($courseId)) {
-            return $this;
+        foreach ($other as $id) {
+            if ($this->contains($id)) {
+                return true;
+            }
         }
-        return new self([...$this->ids, $courseId]);
+        return false;
     }
 
-    public function without(CourseId $courseId): self
+    public function with(StudentId $studentId): self
     {
-        if (!$this->contains($courseId)) {
+        if ($this->contains($studentId)) {
             return $this;
         }
-        return new self(array_filter($this->ids, static fn (CourseId $id) => !$id->equals($courseId)));
+        return new self([...$this->ids, $studentId]);
+    }
+
+    public function without(StudentId $studentId): self
+    {
+        if (!$this->contains($studentId)) {
+            return $this;
+        }
+        return new self(array_filter($this->ids, static fn (StudentId $id) => !$id->equals($studentId)));
     }
 
     public function getIterator(): Traversable
@@ -83,14 +95,9 @@ final class CourseIds implements IteratorAggregate, Countable, ProvidesTags
         return count($this->ids);
     }
 
-    public function isEmpty(): bool
-    {
-        return $this->ids === [];
-    }
-
     /**
      * @template T
-     * @param Closure(CourseId): T $callback
+     * @param Closure(StudentId): T $callback
      * @return array<T>
      */
     public function map(Closure $callback): array

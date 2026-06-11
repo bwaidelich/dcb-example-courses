@@ -13,13 +13,13 @@ use Wwwision\DCBTools\DomainEventAppender;
 final readonly class UnsubscribeStudentFromCourseCommandHandler
 {
     public function __construct(
-        private DomainEventAppender $domainEventAppender,
+        private DomainEventAppender $eventStore,
     ) {
     }
 
     public function __invoke(UnsubscribeStudentFromCourse $command): void
     {
-        $this->domainEventAppender->append(
+        $this->eventStore->append(
             constraints: [
                 Course::exists($command->courseId),
                 Student::isRegistered($command->studentId),

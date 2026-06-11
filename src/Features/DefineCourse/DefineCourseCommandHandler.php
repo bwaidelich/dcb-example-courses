@@ -14,17 +14,17 @@ use function Wwwision\DCBTools\not;
 final readonly class DefineCourseCommandHandler
 {
     public function __construct(
-        private DomainEventAppender $domainEventAppender,
+        private DomainEventAppender $eventStore,
     ) {
     }
 
     public function __invoke(DefineCourse $command): void
     {
-        $this->domainEventAppender->append(
+        $this->eventStore->append(
             constraints: [
                 not(Course::exists($command->courseId))
             ],
-            onSuccess: static fn () => new CourseDefined($command->courseId, $command->initialCapacity, $command->courseTitle),
+            onSuccess: static fn () => new CourseDefined($command->courseId, $command->initialCapacity, $command->courseTitle, $command->schedule),
         );
     }
 }
