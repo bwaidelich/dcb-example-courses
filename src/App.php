@@ -18,6 +18,7 @@ use Wwwision\DCBExample\Features\DefineCourse\RenameCourseCommandHandler;
 use Wwwision\DCBExample\Features\DefineCourse\RescheduleCourseCommandHandler;
 use Wwwision\DCBExample\Features\RegisterStudent\Commands\RegisterStudent;
 use Wwwision\DCBExample\Features\RegisterStudent\RegisterStudentCommandHandler;
+use Wwwision\DCBExample\Model\Course\Dto\CourseSchedule;
 use Wwwision\DCBTools\DomainEventAppender;
 use Wwwision\DCBTools\StateProjector;
 
@@ -28,14 +29,10 @@ final readonly class App
 {
     public function __construct(
         private DomainEventAppender $domainEventAppender,
-        private StateProjector $stateProjector,
     ) {
     }
 
-    /**
-     * @param array{start: string, end: string} $schedule
-     */
-    public function defineCourse(string $courseId, string $courseTitle, int $initialCapacity, array $schedule): void
+    public function defineCourse(string $courseId, int $initialCapacity, string $courseTitle, CourseSchedule $schedule): void
     {
         $handler = new DefineCourseCommandHandler($this->domainEventAppender);
         $handler(new DefineCourse($courseId, $initialCapacity, $courseTitle, $schedule));
@@ -53,7 +50,7 @@ final readonly class App
         $handler(new ChangeCourseCapacity($courseId, $newCapacity));
     }
 
-    public function rescheduleCourse(string $courseId, array $newSchedule): void
+    public function rescheduleCourse(string $courseId, CourseSchedule $newSchedule): void
     {
         $handler = new RescheduleCourseCommandHandler($this->domainEventAppender);
         $handler(new RescheduleCourse($courseId, $newSchedule));
@@ -67,7 +64,7 @@ final readonly class App
 
     public function subscribeStudentToCourse(string $studentId, string $courseId): void
     {
-        $handler = new SubscribeStudentToCourseCommandHandler($this->domainEventAppender, $this->stateProjector);
+        $handler = new SubscribeStudentToCourseCommandHandler($this->domainEventAppender);
         $handler(new SubscribeStudentToCourse($studentId, $courseId));
     }
 

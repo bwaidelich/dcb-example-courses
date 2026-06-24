@@ -8,6 +8,7 @@ use stdClass;
 use Wwwision\DCBExample\Model\Course\Dto\CourseCapacity;
 use Wwwision\DCBExample\Model\Course\Dto\CourseId;
 use Wwwision\DCBExample\Model\Course\Dto\CourseIds;
+use Wwwision\DCBExample\Model\Course\Dto\CourseSchedule;
 use Wwwision\DCBExample\Model\Course\Dto\CourseSchedules;
 use Wwwision\DCBExample\Model\Course\Dto\CourseTitle;
 use Wwwision\DCBExample\Model\Student\Dto\StudentId;
@@ -39,11 +40,16 @@ final readonly class CourseDecisionModels
         foreach ($courseIds as $courseId) {
             $projections[] = CourseProjections::schedule($courseId);
         }
-        $projection = CompositeProjection::create($projections, CourseSchedules::class);
+        // A plain (array) composite rather than hydrating CourseSchedules directly: schedule() yields null for a course
+        // that was never defined, and CourseSchedules' constructor does not accept null. Null schedules are skipped here.
+        $projection = CompositeProjection::create($projections);
         return Constraint::create(
             name: __FUNCTION__,
             projection: $projection,
-            predicate: static fn (CourseSchedules $schedules) => !$schedules->hasOverlaps(),
+            predicate: static function (array $schedules): bool {
+                $knownSchedules = array_values(array_filter($schedules, static fn ($schedule) => $schedule instanceof CourseSchedule));
+                return !CourseSchedules::create(...$knownSchedules)->hasOverlaps();
+            },
         );
     }
 

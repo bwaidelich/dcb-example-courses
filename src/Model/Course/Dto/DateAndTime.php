@@ -6,6 +6,7 @@ namespace Wwwision\DCBExample\Model\Course\Dto;
 
 use DateTimeImmutable;
 use JsonSerializable;
+use Webmozart\Assert\Assert;
 
 final readonly class DateAndTime implements JsonSerializable
 {
@@ -27,7 +28,9 @@ final readonly class DateAndTime implements JsonSerializable
 
     public function toPhpDateTime(): DateTimeImmutable
     {
-        return DateTimeImmutable::createFromFormat(self::FORMAT, $this->value, new \DateTimeZone('UTC'));
+        $result = DateTimeImmutable::createFromFormat(self::FORMAT, $this->value, new \DateTimeZone('UTC'));
+        Assert::isInstanceOf($result, DateTimeImmutable::class);
+        return $result;
     }
 
     public function jsonSerialize(): string

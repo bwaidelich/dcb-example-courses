@@ -38,6 +38,9 @@ final class CourseSchedules implements IteratorAggregate
         return new self(...[]);
     }
 
+    /**
+     * @param array<CourseSchedule|array{start:string,end:string}> $schedules
+     */
     public static function fromArray(array $schedules): self
     {
         return self::create(...array_map(static fn (array|CourseSchedule $schedule) => is_array($schedule) ? CourseSchedule::fromArray($schedule) : $schedule, $schedules));

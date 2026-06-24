@@ -30,8 +30,7 @@
     "roave/security-advisories": "dev-latest",
     "phpstan/phpstan": "^2",
     "squizlabs/php_codesniffer": "^4.0.x-dev",
-    "phpunit/phpunit": "^11",
-    "behat/behat": "^3"
+    "phpunit/phpunit": "^12"
   },
   "autoload": {
     "psr-4": {
@@ -47,11 +46,11 @@
     "test:phpstan": "phpstan",
     "test:cs": "phpcs --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
     "test:cs:fix": "phpcbf --colors --standard=PSR12 --exclude=Generic.Files.LineLength src",
-    "test:behat": "behat",
+    "test:phpunit": "phpunit",
     "test": [
       "@test:phpstan",
       "@test:cs",
-      "@test:behat"
+      "@test:phpunit"
     ]
   }
 }

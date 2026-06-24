@@ -16,6 +16,9 @@ final readonly class DefineCourse
     public CourseTitle $courseTitle;
     public CourseSchedule $schedule;
 
+    /**
+     * @param CourseSchedule|array{start:string,end:string} $schedule
+     */
     public function __construct(
         CourseId|string $courseId,
         CourseCapacity|int $initialCapacity,

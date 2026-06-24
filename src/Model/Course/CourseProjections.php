@@ -79,6 +79,7 @@ final readonly class CourseProjections
     {
         return AtomicProjection::create($courseId, initialState: null)
             ->when(CourseDefined::class, static fn ($_, CourseDefined $event) => $event->schedule)
+            ->when(CourseRescheduled::class, static fn ($_, CourseRescheduled $event) => $event->newSchedule)
             ;
     }
 
@@ -102,9 +103,6 @@ final readonly class CourseProjections
         if ($courseIds instanceof CourseId) {
             $courseIds = CourseIds::create($courseIds);
         }
-        return AtomicProjection::create($courseIds, initialState: StudentIds::none())
-            ->when(StudentSubscribedToCourse::class, static fn (StudentIds $state, StudentSubscribedToCourse $event) => $courseIds->isEmpty() ? $state : $state->with($event->studentId))
-            ->when(StudentUnsubscribedFromCourse::class, static fn (StudentIds $state, StudentUnsubscribedFromCourse $event) => $courseIds->isEmpty() ? $state : $state->without($event->studentId))
-            ;
+        return new SubscribedStudentsProjection($courseIds);
     }
 }

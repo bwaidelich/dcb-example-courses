@@ -16,9 +16,11 @@ use Wwwision\DCBExample\Features\CourseSubscription\Events\StudentUnsubscribedFr
 use Wwwision\DCBExample\Features\DefineCourse\Events\CourseCapacityChanged;
 use Wwwision\DCBExample\Features\DefineCourse\Events\CourseDefined;
 use Wwwision\DCBExample\Features\DefineCourse\Events\CourseRenamed;
+use Wwwision\DCBExample\Features\DefineCourse\Events\CourseRescheduled;
 use Wwwision\DCBExample\Features\RegisterStudent\Events\StudentRegistered;
 use Wwwision\DCBExample\Model\Course\Dto\CourseCapacity;
 use Wwwision\DCBExample\Model\Course\Dto\CourseId;
+use Wwwision\DCBExample\Model\Course\Dto\CourseSchedule;
 use Wwwision\DCBExample\Model\Course\Dto\CourseTitle;
 use Wwwision\DCBExample\Model\Student\Dto\StudentId;
 use Wwwision\DCBTools\DomainEventAppender;
@@ -82,6 +84,7 @@ $eventSerializer = new SimpleEventSerializer([
     CourseCapacityChanged::class,
     CourseDefined::class,
     CourseRenamed::class,
+    CourseRescheduled::class,
     StudentRegistered::class,
     StudentSubscribedToCourse::class,
     StudentUnsubscribedFromCourse::class,
@@ -95,9 +98,9 @@ $app = new App($domainEventAppender, $stateProjector);
 
 // Example:
 // 1. Define a course (c1)
-$app->defineCourse('c1', 'Course 01', 10, ['start' => '2026-08-01 15:30:00', 'end' => '2026-08-01 17:30:00']);
-$app->defineCourse('c2', 'Course 02', 8, ['start' => '2026-08-01 17:00:00', 'end' => '2026-08-01 18:30:00']);
-$app->defineCourse('c3', 'Course 03', 7, ['start' => '2026-08-01 17:30:00', 'end' => '2026-08-01 18:45:00']);
+$app->defineCourse('c1', 10, 'Course 01', CourseSchedule::fromArray(['start' => '2026-08-01 15:30:00', 'end' => '2026-08-01 17:30:00']));
+$app->defineCourse('c2', 8, 'Course 02', CourseSchedule::fromArray(['start' => '2026-08-01 17:00:00', 'end' => '2026-08-01 18:30:00']));
+$app->defineCourse('c3', 7, 'Course 03', CourseSchedule::fromArray(['start' => '2026-08-01 17:30:00', 'end' => '2026-08-01 18:45:00']));
 
 // 2. rename it
 $app->renameCourse('c1', 'Course 01 renamed');
@@ -113,8 +116,8 @@ $app->subscribeStudentToCourse('s1', 'c1');
 $app->subscribeStudentToCourse('s1', 'c3');
 #$app->subscribeStudentToCourse('s2', 'c2');
 
-$app->rescheduleCourse('c3', ['start' => '2026-08-01 14:00:00', 'end' => '2026-08-01 15:30:00']);
-#$app->rescheduleCourse('c3', ['start' => '2026-08-01 17:30:00', 'end' => '2026-08-01 19:45:00']);
+$app->rescheduleCourse('c3', CourseSchedule::fromArray(['start' => '2026-08-01 14:00:00', 'end' => '2026-08-01 15:30:00']));
+#$app->rescheduleCourse('c3', CourseSchedule::fromArray(['start' => '2026-08-01 17:30:00', 'end' => '2026-08-01 19:45:00']));
 
 // 5. change capacity of course (c1) to 5
 $app->changeCourseCapacity('c1', 5);

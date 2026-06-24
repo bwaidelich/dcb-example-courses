@@ -16,6 +16,9 @@ final readonly class CourseRescheduled implements DomainEvent
     public CourseId $courseId;
     public CourseSchedule $newSchedule;
 
+    /**
+     * @param CourseSchedule|array{start:string,end:string} $newSchedule
+     */
     public function __construct(
         CourseId|string $courseId,
         CourseSchedule|array $newSchedule,

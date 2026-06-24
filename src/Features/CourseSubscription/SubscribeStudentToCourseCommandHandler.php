@@ -8,6 +8,7 @@ use Wwwision\DCBExample\Features\CourseSubscription\Commands\SubscribeStudentToC
 use Wwwision\DCBExample\Features\CourseSubscription\Events\StudentSubscribedToCourse;
 use Wwwision\DCBExample\Model\Course\CourseDecisionModels as Course;
 use Wwwision\DCBExample\Model\Course\Dto\CourseIds;
+use Wwwision\DCBExample\Model\Course\Dto\CourseTitle;
 use Wwwision\DCBExample\Model\Student\StudentDecisionModels as Student;
 use Wwwision\DCBExample\Model\Student\StudentProjections;
 use Wwwision\DCBTools\DomainEventAppender;

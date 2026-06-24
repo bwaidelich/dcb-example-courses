@@ -7,11 +7,12 @@
          requireCoverageMetadata="true"
          beStrictAboutCoverageMetadata="true"
          beStrictAboutOutputDuringTests="true"
+         beStrictAboutTestsThatDoNotTestAnything="false"
          failOnRisky="true"
          failOnWarning="true">
     <testsuites>
-        <testsuite name="default">
-            <directory>tests/unit</directory>
+        <testsuite name="consistency">
+            <directory>tests/Consistency</directory>
         </testsuite>
     </testsuites>
 
